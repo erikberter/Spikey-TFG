@@ -1,0 +1,113 @@
+import torch
+import torch.nn as nn
+
+from norse.torch.module import SequentialState
+
+from norse.torch.functional.lif import LIFParameters
+from norse.torch.module.encode import ConstantCurrentLIFEncoder
+from norse.torch.module.lif import LIFRecurrentCell, LIFCell
+from norse.torch.module.leaky_integrator import LILinearCell
+
+class CNN_Norse_model(nn.Module):
+    def __init__(self, n_classes):
+        super(CNN_Norse_model, self).__init__()
+        self.state_dim = 4
+        self.input_features = 16
+        self.hidden_features = 128
+        self.output_features = 2
+        self.seq_length = 2
+        self.n_classes = n_classes
+        self.constant_current_encoder = ConstantCurrentLIFEncoder(16)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.4))
+
+        self.convs = [
+            nn.Conv2d( 3, 8, kernel_size=3, stride=2, padding=1, bias=False),
+            nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(16, 24, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(24, 32, kernel_size=3, stride=1, padding=1, bias=False),
+            nn.Conv2d(32, 48, kernel_size=3, stride=2, padding=1, bias=False)
+        ]
+        #for conv in self.convs:
+        #    conv.weight.data.uniform_(-0.1, 0.3)
+
+        self.features = SequentialState(
+            # preparation
+            # Dimension [3, 112, 112]
+            nn.BatchNorm2d(3),
+            self.convs[0], 
+            
+        )
+
+        self.features2 = SequentialState(
+            nn.ReLU(),
+            # Dimension [8, 55, 55] ~ 96800
+            nn.BatchNorm2d(8),
+            self.convs[1],
+            nn.ReLU(),
+             # Dimension [16, 27, 27] ~ 186624
+            nn.BatchNorm2d(16),
+            nn.MaxPool2d(2),
+             # Dimension [16, 13, 13] ~ 48400
+            self.convs[2],
+            nn.ReLU(),
+             # Dimension [32, 26, 26] ~ 96800
+            nn.BatchNorm2d(24),
+            nn.MaxPool2d(2),
+            
+             # Dimension [32, 27, 27] ~ 23328
+            self.convs[3],
+            nn.ReLU(),
+             # Dimension [32, 26, 26] ~ 21632
+            torch.nn.BatchNorm2d(32),
+            nn.MaxPool2d(2),
+             # Dimension [32, 13, 13] ~ 5408
+            self.convs[4],
+            nn.ReLU(),
+            #LIFCell(p),
+             # Dimension [64, 7, 7] ~ 3136
+            torch.nn.BatchNorm2d(48),
+            nn.Flatten(),
+        )
+
+        self.classification = SequentialState(
+            # Classification
+            #LIFCell(p),
+            
+            nn.Linear(768, 256, bias=False),
+            #LIFCell(p),
+            nn.ReLU(),
+            nn.Linear(256, n_classes, bias=False),
+        )
+        
+        self.saved_log_probs = []
+        self.rewards = []
+
+    def forward(self, x):
+        voltages = torch.empty(
+            self.seq_length, x.shape[0], self.n_classes, device=x.device, dtype=x.dtype
+        )
+        sf = None
+        sc = None
+        #print(f"Casca0 {x[0][0]}")
+        for ts in range(self.seq_length):
+            out_f, sf = self.features(x, sf)
+            #print(f"Cosca {self.features[0].weight.data}")
+            #print(f"Casca {out_f[0][0]}")
+
+            out_f2, sc1 = self.features2(out_f, sf)
+            #print(f"Casca1 {out_f2}")
+
+            out_c, sc = self.classification(out_f2, sc1)
+            #print(f"Casca2 {out_c}")
+            
+            #input("POPO")
+            voltages[ts, :, :] = out_c + 0.001 * torch.randn(
+                x.shape[0], self.n_classes, device=x.device
+            )
+        
+        y_hat, _ = torch.max(voltages, 0)
+        
+        y_hat = torch.nn.functional.softmax(y_hat, dim=1)
+        
+        return y_hat
