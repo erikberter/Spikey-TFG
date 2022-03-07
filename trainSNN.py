@@ -88,7 +88,8 @@ def run_net(net, data, num_classes):
             #print(f"Output JEJE:\n {output}")
             cops[:,i,:] += output
         results = torch.as_tensor(cops)
-        cops, _ = torch.max(results, 1)
+        #cops, _ = torch.max(results, 1)
+        cops = torch.mean(results, 1)
     #print(f"Outputs:\n {cops}\n")
     #input("SANTA")
     #_, preds = torch.max(cops, 1)
