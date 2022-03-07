@@ -139,10 +139,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=18, preprocess = False), batch_size=8, shuffle=True, num_workers=2)
+    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=32, preprocess = False), batch_size=8, shuffle=True, num_workers=2)
     if useVal:
-        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=18), batch_size=8, num_workers=2)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=18), batch_size=8, num_workers=1)
+        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=32), batch_size=8, num_workers=2)
+    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=32), batch_size=8, num_workers=1)
 
     if useVal:
         trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
