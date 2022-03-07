@@ -38,7 +38,7 @@ snapshot = 5 # Store a model every snapshot epochs
 lr = 5e-4 # Learning rate
 
 
-dataset = 'kth' # Options: hmdb51 or ucf101
+dataset = 'ucf101' # Options: hmdb51 or ucf101
 
 if dataset == 'hmdb51':
     num_classes=51
@@ -88,8 +88,8 @@ def run_net(net, data, num_classes):
             #print(f"Output JEJE:\n {output}")
             cops[:,i,:] += output
         results = torch.as_tensor(cops)
-        #cops, _ = torch.max(results, 1)
-        cops = torch.mean(results, 1)
+        cops, _ = torch.max(results, 1)
+        #cops = torch.mean(results, 1)
     #print(f"Outputs:\n {cops}\n")
     #input("SANTA")
     #_, preds = torch.max(cops, 1)
@@ -140,10 +140,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=32, preprocess = False), batch_size=8, shuffle=True, num_workers=2)
+    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=32, preprocess = False), batch_size=32, shuffle=True, num_workers=2)
     if useVal:
-        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=32), batch_size=8, num_workers=2)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=32), batch_size=8, num_workers=1)
+        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=32), batch_size=32, num_workers=2)
+    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=32), batch_size=32, num_workers=1)
 
     if useVal:
         trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
@@ -213,9 +213,14 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels)
 
-            epoch_loss = running_loss / trainval_sizes[phase]
-            epoch_acc = running_corrects.double() / trainval_sizes[phase]
-
+            if trainval_sizes[phase] == 0:
+                epoch_loss = 0
+                epoch_acc = 0
+                continue
+            else:
+                epoch_loss = running_loss / trainval_sizes[phase]
+                epoch_acc = running_corrects.double() / trainval_sizes[phase]
+            
             # Log the data
             writer.add_scalar('data/'+phase+'_loss_epoch', epoch_loss, epoch)
             writer.add_scalar('data/'+phase+'_acc_epoch', epoch_acc, epoch)
