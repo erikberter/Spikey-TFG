@@ -74,18 +74,18 @@ class SNN_Model(nn.Module):
                 self.features[i].weight.data *= weigth_scale
         
 
-        #self.classification = SequentialState(
-        #    LILinearCell(768, n_classes, p),
-        #)
-
         self.classification = SequentialState(
-            nn.Linear(768, 128, bias = False),
-            LIFCell(p),
-            nn.Linear(128, 32, bias = False),
-            LIFCell(p),
-            nn.Linear(32, self.n_classes, bias = False),
-            LICell(dt = 0.001),
+            LILinearCell(768, n_classes, p),
         )
+
+        #self.classification = SequentialState(
+        #    nn.Linear(768, 128, bias = False),
+        #    LIFCell(p),
+        #    nn.Linear(128, 32, bias = False),
+        #    LIFCell(p),
+        #    nn.Linear(32, self.n_classes, bias = False),
+        #    LICell(dt = 0.001),
+        #)
 
         #self.classification[2].weight.data = torch.abs(self.classification[2].weight.data)
 

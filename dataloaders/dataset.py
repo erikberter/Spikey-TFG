@@ -40,8 +40,8 @@ class VideoDataset(Dataset):
 
         if (not self.check_preprocess()) or preprocess:
             print('Preprocessing of {} dataset, this will take long, but it will be done only once.'.format(dataset))
-            if dataset == 'ucf101':
-                self.preprocess(custom_ttv = True, has_val = False)
+            if dataset == 'ucf101' or dataset == 'kth':
+                self.preprocess(custom_ttv = True)
             else:
                 self.preprocess()
 
@@ -61,22 +61,10 @@ class VideoDataset(Dataset):
         # Convert the list of label names into an array of label indices
         self.label_array = np.array([self.label2index[label] for label in labels], dtype=int)
 
-        if dataset == "ucf101":
-            if not os.path.exists('dataloaders/ucf_labels.txt'):
-                with open('dataloaders/ucf_labels.txt', 'w') as f:
-                    for id, label in enumerate(sorted(self.label2index)):
-                        f.writelines(str(id+1) + ' ' + label + '\n')
-
-        elif dataset == 'hmdb51':
-            if not os.path.exists('dataloaders/hmdb_labels.txt'):
-                with open('dataloaders/hmdb_labels.txt', 'w') as f:
-                    for id, label in enumerate(sorted(self.label2index)):
-                        f.writelines(str(id+1) + ' ' + label + '\n')
-        elif dataset == 'kth':
-            if not os.path.exists('dataloaders/kth_labels.txt'):
-                with open('dataloaders/kth_labels.txt', 'w') as f:
-                    for id, label in enumerate(sorted(self.label2index)):
-                        f.writelines(str(id+1) + ' ' + label + '\n')
+        if not os.path.exists('dataloaders/' + dataset+ '_labels.txt'):
+            with open('dataloaders/' + dataset + '_labels.txt', 'w') as f:
+                for id, label in enumerate(sorted(self.label2index)):
+                    f.writelines(str(id+1) + ' ' + label + '\n')
 
 
     def __len__(self):
@@ -123,7 +111,7 @@ class VideoDataset(Dataset):
 
         return True
 
-    def preprocess(self, custom_ttv = False, has_val = True):
+    def preprocess(self, custom_ttv = False):
         """
             Parameters:
                 custom_ttv (bool): True if the dataset has a custom train-test-val ordering
@@ -144,23 +132,34 @@ class VideoDataset(Dataset):
                 train_and_valid, test = train_test_split(video_files, test_size=0.2, random_state=42)
                 train, val = train_test_split(train_and_valid, test_size=0.2, random_state=42)
             else:
-                custom_ttv_dir = Path.train_test_val_split_dir(self.dataset_name)
-                custom_train_path = os.path.join(custom_ttv_dir, "trainlist01.txt")
-                custom_test_path = os.path.join(custom_ttv_dir, "testlist01.txt")
-
-                train = set(line.strip().split("/")[1].split(" ")[0] for line in open(custom_train_path) if file == line.strip().split("/")[0])
-                test = set(line.strip().split("/")[1] for line in open(custom_test_path) if file == line.strip().split("/")[0])
+                train_file, val_file, test_file = Path.train_test_val_split_files(self.dataset_name)
+                
+                if 'ufc' in self.dataset_name: 
+                    train = set(line.strip().split("/")[1].split(" ")[0] for line in open(train_file) if file == line.strip().split("/")[0])
+                    if val_file is not None:
+                        val = set(line.strip().split("/")[1].split(" ")[0] for line in open(val_file) if file == line.strip().split("/")[0])
+                    else:
+                        val = None
+                    test = set(line.strip().split("/")[1] for line in open(test_file) if file == line.strip().split("/")[0])
+                else:
+                    train = set(video_file for line in open(train_file)  for video_file in video_files if line.strip() in video_file)
+                    
+                    if val_file is not None:
+                        val = set(video_file for line in open(val_file) for video_file in video_files if line.strip() in video_file)
+                    else:
+                        val = None
+                    test = set(video_file for line in open(test_file) for video_file in video_files if line.strip() in video_file)
 
 
 
             train_dir = os.path.join(self.output_dir, 'train', file)
             test_dir = os.path.join(self.output_dir, 'test', file)
-            if has_val:
+            if val is not None:
                 val_dir = os.path.join(self.output_dir, 'val', file)
 
             if not os.path.exists(train_dir):
                 os.mkdir(train_dir)
-            if has_val and not os.path.exists(val_dir):
+            if val is not None and not os.path.exists(val_dir):
                 os.mkdir(val_dir)
             if not os.path.exists(test_dir):
                 os.mkdir(test_dir)
@@ -168,7 +167,7 @@ class VideoDataset(Dataset):
             for video in train:
                 self.process_video(video, file, train_dir)
             
-            if has_val:
+            if val is not None:
                 for video in val:
                     self.process_video(video, file, val_dir)
 

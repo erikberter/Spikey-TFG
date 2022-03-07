@@ -28,11 +28,23 @@ class Path(object):
             raise NotImplementedError
 
     @staticmethod
-    def train_test_val_split_dir(database):
+    def train_test_val_split_files(database):
         if database == 'ucf101':
-            ttv_dir = 'datasets\\UFC101\\ucfTrainTestlist'
+            train_file = 'datasets\\UFC101\\ucfTrainTestlist\\trainlist01.txt'
+            test_file = 'datasets\\UFC101\\ucfTrainTestlist\\testlist01.txt'
 
-            return ttv_dir
+
+            return train_file, None, test_file
+        elif database == 'kth':
+            
+            train_file = 'datasets\\KTH\\train_labels.txt'
+            val_file = 'datasets\\KTH\\val_labels.txt'
+            test_file = 'datasets\\KTH\\test_labels.txt'
+
+            return train_file, val_file, test_file
+        else:
+            print('Database splits {} not available.'.format(database))
+            raise NotImplementedError
 
     @staticmethod
     def model_dir():

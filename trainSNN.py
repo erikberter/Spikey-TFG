@@ -33,12 +33,12 @@ useVal = True
 
 useWholeTimeSet = False
 
-nTestInterval = 20 # Run on test set every nTestInterval epochs
+nTestInterval = 5 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
 lr = 5e-4 # Learning rate
 
 
-dataset = 'ucf101' # Options: hmdb51 or ucf101
+dataset = 'kth' # Options: hmdb51 or ucf101
 
 if dataset == 'hmdb51':
     num_classes=51
@@ -204,7 +204,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 
                 
                 loss = criterion(cops.double(), labels.long())
-                print(f"TEnemos una loss de {loss}")
+                #print(f"TEnemos una loss de {loss}")
                 if phase == 'train':
                     loss.backward()
                     optimizer.step()
