@@ -11,9 +11,9 @@ class Path(object):
             return root_dir, output_dir
         elif database == 'hmdb51':
             # folder that contains class labels
-            root_dir = '/Path/to/hmdb-51'
+            root_dir = 'datasets\\HMBD51\\HMBD51'
 
-            output_dir = '/path/to/VAR/hmdb51'
+            output_dir = 'datasets\\HMBD51\\Processed'
 
             return root_dir, output_dir
         elif database == 'kth':
@@ -42,6 +42,8 @@ class Path(object):
             test_file = 'datasets\\KTH\\test_labels.txt'
 
             return train_file, val_file, test_file
+        elif database =='hmdb51':
+            return 'datasets\\HMBD51\\splits', None, None
         else:
             print('Database splits {} not available.'.format(database))
             raise NotImplementedError

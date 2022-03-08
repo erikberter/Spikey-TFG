@@ -8,6 +8,58 @@ from torch.utils.data import Dataset
 from mypath import Path
 
 
+
+def get_ufc101(dataset, file, video_files):
+    train_file, val_file, test_file = Path.train_test_val_split_files(dataset)
+    train = set(line.strip().split("/")[1].split(" ")[0] for line in open(train_file) if file == line.strip().split("/")[0])
+    if val_file is not None:
+        val = set(line.strip().split("/")[1].split(" ")[0] for line in open(val_file) if file == line.strip().split("/")[0])
+    else:
+        val = None
+    test = set(line.strip().split("/")[1] for line in open(test_file) if file == line.strip().split("/")[0])
+    return train, val, test
+
+def get_kth(dataset,file, video_files):
+    train_file, val_file, test_file = Path.train_test_val_split_files(dataset)
+    train = set(video_file for line in open(train_file)  for video_file in video_files if line.strip() in video_file)
+                    
+    if val_file is not None:
+        val = set(video_file for line in open(val_file) for video_file in video_files if line.strip() in video_file)
+    else:
+        val = None
+    test = set(video_file for line in open(test_file) for video_file in video_files if line.strip() in video_file)
+    return train, val, test
+
+
+def get_hmdb51(dataset, file, video_files):
+
+    split_n = 1
+
+    
+    split_file_base, _, _ = Path.train_test_val_split_files(dataset)
+    file_r = os.path.join(split_file_base, file+'_test_split' + str(split_n) + '.txt')
+
+    train_files = [train_name.split()[0] for train_name in open(file_r) if train_name.split()[1] == '1' ]
+    val_files = [train_name.split()[0] for train_name in open(file_r) if train_name.split()[1] == '0' ]
+    test_files = [train_name.split()[0] for train_name in open(file_r) if train_name.split()[1] == '2' ]
+
+    
+    return train_files, val_files, test_files
+
+
+class SplitExtractor:
+    def __init__(self):
+        pass
+
+    def get_split_train_test_files_names(self, dataset, label, video_files):
+        
+        if dataset == 'ufc101':
+            return get_ufc101(dataset, label, video_files)
+        elif dataset == 'kth':
+            return get_kth(dataset, label, video_files)
+
+
+
 class VideoDataset(Dataset):
     r"""A Dataset for a folder of videos. Expects the directory structure to be
     directory->[train/val/test]->[class labels]->[videos]. Initializes with a list
@@ -40,7 +92,7 @@ class VideoDataset(Dataset):
 
         if (not self.check_preprocess()) or preprocess:
             print('Preprocessing of {} dataset, this will take long, but it will be done only once.'.format(dataset))
-            if dataset == 'ucf101' or dataset == 'kth':
+            if dataset == 'ucf101' or dataset == 'kth' or dataset =='hmdb51':
                 self.preprocess(custom_ttv = True)
             else:
                 self.preprocess()
@@ -61,8 +113,8 @@ class VideoDataset(Dataset):
         # Convert the list of label names into an array of label indices
         self.label_array = np.array([self.label2index[label] for label in labels], dtype=int)
 
-        if not os.path.exists('dataloaders/' + dataset+ '_labels.txt'):
-            with open('dataloaders/' + dataset + '_labels.txt', 'w') as f:
+        if not os.path.exists('dataloaders/labels/' + dataset+ '_labels.txt'):
+            with open('dataloaders/labels/' + dataset + '_labels.txt', 'w') as f:
                 for id, label in enumerate(sorted(self.label2index)):
                     f.writelines(str(id+1) + ' ' + label + '\n')
 
@@ -141,7 +193,7 @@ class VideoDataset(Dataset):
                     else:
                         val = None
                     test = set(line.strip().split("/")[1] for line in open(test_file) if file == line.strip().split("/")[0])
-                else:
+                elif 'kth' == self.dataset_name:
                     train = set(video_file for line in open(train_file)  for video_file in video_files if line.strip() in video_file)
                     
                     if val_file is not None:
@@ -149,7 +201,8 @@ class VideoDataset(Dataset):
                     else:
                         val = None
                     test = set(video_file for line in open(test_file) for video_file in video_files if line.strip() in video_file)
-
+                else:
+                    train, val, test = get_hmdb51(self.dataset_name, file, video_files)
 
 
             train_dir = os.path.join(self.output_dir, 'train', file)

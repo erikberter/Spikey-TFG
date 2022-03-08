@@ -87,6 +87,7 @@ class CSNN_ModelT(nn.Module):
 
         # Scales the CNN output by a factor to improve the ConstantCurrentLIFEncoder Input
         self.cnn_scaler = 7
+        self.encoder_scaler = 1.5
 
         self.cnn = CNN_Feature_Extractor(debug= self.debug)
         self.snn = SNN_Model_a(n_classes, seq_length, p, uses_ts=use_encoder, debug= self.debug)
@@ -100,7 +101,7 @@ class CSNN_ModelT(nn.Module):
             print(f"CNN {x[0][:20]}")
             print(f"CNN {x.shape}")
         if self.use_encoder:
-            x = 1.5 * self.encoder(x)
+            x = self.encoder_scaler * self.encoder(x)
         if self.debug:
             print(f"Encoder {x[7][0][:20]}")
             print(f"CNN {x.shape}")

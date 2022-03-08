@@ -33,12 +33,12 @@ useVal = True
 
 useWholeTimeSet = False
 
-nTestInterval = 5 # Run on test set every nTestInterval epochs
+nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
 lr = 5e-4 # Learning rate
 
 
-dataset = 'ucf101' # Options: hmdb51 or ucf101
+dataset = 'hmdb51' # Options: hmdb51 or ucf101
 
 if dataset == 'hmdb51':
     num_classes=51
