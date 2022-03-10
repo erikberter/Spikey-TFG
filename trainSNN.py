@@ -7,6 +7,7 @@ from network.SNN_model import SNN_ModelT
 
 from network.SNN_Recurrent import SNNR_ModelT
 from network.norse.CSNN_model import CSNN_ModelT
+from network.norse.C3SNN_model import C3SNN_ModelT
 
 from tqdm import tqdm
 
@@ -31,7 +32,7 @@ resume_epoch = 0  # Default is 0, change if want to resume
 useTest = True # See evolution of the test set when training
 useVal = True
 
-useWholeTimeSet = False
+useWholeTimeSet = True
 
 nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
@@ -74,11 +75,13 @@ def run_net(net, data, num_classes):
 
     cops = torch.zeros(data.shape[0],data.shape[2], num_classes).to(device)
     data = torch.transpose(data, 1, 2)
+    # Data shape is now [batch_size, timestep, channels, height, width]
     data /= 25
 
     torch.set_printoptions(precision=3, sci_mode=False)
     if useWholeTimeSet:
-        data = torch.transpose(data, 0, 1)
+        data = torch.transpose(data, 1, 2)
+        # Data shape is now [batch_size, channels, timestep, height, width]
         cops = net(data)
     else:
         for i in range(0, data.shape[1]):
@@ -114,7 +117,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     phases = ['train', 'val'] if useVal else ['train']
 
     
-    model = CSNN_ModelT(num_classes, use_encoder=True)
+    model = C3SNN_ModelT(num_classes, use_encoder=True)
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
@@ -140,10 +143,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=32, preprocess = False), batch_size=32, shuffle=True, num_workers=2)
+    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16, preprocess = False), batch_size=16, shuffle=True, num_workers=4)
     if useVal:
-        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=32), batch_size=32, num_workers=2)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=32), batch_size=32, num_workers=1)
+        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=16), batch_size=16, num_workers=4)
+    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=16), batch_size=16, num_workers=4)
 
     if useVal:
         trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
