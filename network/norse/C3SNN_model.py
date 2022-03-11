@@ -48,14 +48,21 @@ class SNN_Model_a(nn.Module):
         #)
         
 
-        self.classification = SequentialState(
-            nn.Linear(1024, 256, bias = False),
-            LIFCell(p),
-            LILinearCell(256, n_classes, p),
+        #self.classification = SequentialState(
+        #    nn.Linear(1024, 256, bias = False),
+        #    LIFCell(p),
+        #    LILinearCell(256, n_classes, p),
+        #)
+
+        self.classification = nn.Sequential(
+            nn.Linear(1024, n_classes, bias = False),
+            #nn.ReLU(),
+            #nn.Dropout(0.3),
+            #nn.Linear(256, n_classes)
         )
 
     def forward(self, x):
-        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        """batch_size = x.shape[1] if self.uses_ts else x.shape[0]
         
         voltages = torch.empty(
             self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
@@ -69,7 +76,9 @@ class SNN_Model_a(nn.Module):
 
             voltages[ts, :, :] = out_c
 
-        return voltages
+        return voltages"""
+
+        return self.classification(x)
 
 
 class C3SNN_ModelT(nn.Module):
@@ -99,8 +108,8 @@ class C3SNN_ModelT(nn.Module):
         if self.debug:
             #print(f"CNN {x[0][:20]}")
             print(f"CNN {x.shape}")
-        if self.use_encoder:
-            x = self.encoder_scaler * self.encoder(x)
+        #if self.use_encoder:
+        #    x = self.encoder_scaler * self.encoder(x)
         if self.debug:
             #print(f"Encoder {x[7][0][:20]}")
             print(f"CNN {x.shape}")
@@ -108,7 +117,7 @@ class C3SNN_ModelT(nn.Module):
         if self.debug:
             print(f"SNN {x[:,0,:]}")
             print(f"SNN {x.shape}")
-        x = self.decoder(x)
+        #x = self.decoder(x)
         if self.debug:
             print(f"Decoder {x}")
             print(f"Decoder {x.shape}")

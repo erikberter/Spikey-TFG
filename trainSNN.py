@@ -8,7 +8,9 @@ from network.SNN_model import SNN_ModelT
 from network.SNN_Recurrent import SNNR_ModelT
 from network.norse.CSNN_model import CSNN_ModelT
 from network.norse.C3SNN_model import C3SNN_ModelT
+from network.own.C3NN_Base_model import C3DNN
 
+from network.C3NN_model import C3NN_Mod
 from tqdm import tqdm
 
 import torch
@@ -27,6 +29,13 @@ print("Device being used:", device)
 if device == 'cuda:0':
     torch.cuda.empty_cache()
 
+
+torch.set_printoptions(precision=3, sci_mode=False)
+
+#########################
+#      Parameters       #
+#########################
+
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 useTest = True # See evolution of the test set when training
@@ -36,20 +45,23 @@ useWholeTimeSet = True
 
 nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
-lr = 5e-4 # Learning rate
+lr = 1e-3 # Learning rate
+
+dataset = 'kth' # Options: hmdb51 or ucf101
 
 
-dataset = 'hmdb51' # Options: hmdb51 or ucf101
+#########################
+#      N. Classes       #
+#########################
 
-if dataset == 'hmdb51':
-    num_classes=51
-elif dataset == 'kth':
-    num_classes = 6
-elif dataset == 'ucf101':
-    num_classes = 101
+dataset_classes = {'hmdb51' : 51, 'kth' : 6, 'ucf101': 101}
+
+if dataset in dataset_classes:
+    num_classes = dataset_classes[dataset]
 else:
     print('We only implemented hmdb and ucf datasets.')
     raise NotImplementedError
+
 
 save_dir_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 exp_name = os.path.dirname(os.path.abspath(__file__)).split('/')[-1]
@@ -76,9 +88,9 @@ def run_net(net, data, num_classes):
     cops = torch.zeros(data.shape[0],data.shape[2], num_classes).to(device)
     data = torch.transpose(data, 1, 2)
     # Data shape is now [batch_size, timestep, channels, height, width]
-    data /= 25
+    data /= 255
 
-    torch.set_printoptions(precision=3, sci_mode=False)
+    
     if useWholeTimeSet:
         data = torch.transpose(data, 1, 2)
         # Data shape is now [batch_size, channels, timestep, height, width]
@@ -117,7 +129,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     phases = ['train', 'val'] if useVal else ['train']
 
     
-    model = C3SNN_ModelT(num_classes, use_encoder=True)
+    #model = C3NN_Mod(num_classes, use_encoder=True)
+    model = C3DNN(num_classes)
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
@@ -198,7 +211,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
                 preds = torch.max(cops, 1)[1]
                 
-                if phase != 'train':
+                if phase != 'train' and False:
                     print(f"Weights ")
                     print(f"OUT {cops}")
                     print(f"Probs {preds}")
