@@ -7,7 +7,7 @@ from network.SNN_model import SNN_ModelT
 
 from network.SNN_Recurrent import SNNR_ModelT
 from network.norse.CSNN_model import CSNN_ModelT
-from network.norse.C3SNN_model import C3SNN_ModelT, C3DSNN_ModelT, C3DSNN_ModelT2
+from network.norse.C3SNN_model import C3SNN_ModelT, C3DSNN_ModelT, C3DSNN_ModelT2, C3DSNN_C3D_ModelT
 from network.own.C3NN_Base_model import C3DNN, C3DNN_NB, C3DNN_Small, C3DNN_NB_Small, C3DNN_Small_Alt, C3DNN_Med_Alt
 
 from network.own.CNN_LSTM_Base_model import CNN_LSTM, CNN_LSTM_Alt
@@ -135,7 +135,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     #########################
     #         Model         #
     #########################
-    model = C3DSNN_ModelT2(num_classes, True)
+    #model = C3DNN_Small_Alt(num_classes, True)
+    model = C3DSNN_C3D_ModelT(num_classes)
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
