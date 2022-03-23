@@ -7,9 +7,12 @@ from network.SNN_model import SNN_ModelT
 
 from network.SNN_Recurrent import SNNR_ModelT
 from network.norse.CSNN_model import CSNN_ModelT
-from network.norse.C3SNN_model import C3SNN_ModelT
-from network.own.C3NN_Base_model import C3DNN
+from network.norse.C3SNN_model import C3SNN_ModelT, C3DSNN_ModelT, C3DSNN_ModelT2
+from network.own.C3NN_Base_model import C3DNN, C3DNN_NB, C3DNN_Small, C3DNN_NB_Small, C3DNN_Small_Alt, C3DNN_Med_Alt
 
+from network.own.CNN_LSTM_Base_model import CNN_LSTM, CNN_LSTM_Alt
+
+from network.C3D_model import C3D
 from network.C3NN_model import C3NN_Mod
 from tqdm import tqdm
 
@@ -45,7 +48,7 @@ useWholeTimeSet = True
 
 nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
-lr = 1e-3 # Learning rate
+lr = 2e-4 # Learning rate
 
 dataset = 'kth' # Options: hmdb51 or ucf101
 
@@ -92,6 +95,7 @@ def run_net(net, data, num_classes):
 
     
     if useWholeTimeSet:
+        # Comment if LSTM
         data = torch.transpose(data, 1, 2)
         # Data shape is now [batch_size, channels, timestep, height, width]
         cops = net(data)
@@ -128,9 +132,10 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     global device
     phases = ['train', 'val'] if useVal else ['train']
 
-    
-    #model = C3NN_Mod(num_classes, use_encoder=True)
-    model = C3DNN(num_classes)
+    #########################
+    #         Model         #
+    #########################
+    model = C3DSNN_ModelT2(num_classes, True)
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
