@@ -7,9 +7,10 @@ class C3D(nn.Module):
     The C3D network.
     """
 
-    def __init__(self, num_classes, pretrained=False):
+    def __init__(self, num_classes, pretrained=False, no_last = False, untrainable = False):
         super(C3D, self).__init__()
 
+        self.no_last = no_last
         self.conv1 = nn.Conv3d(3, 64, kernel_size=(3, 3, 3), padding=(1, 1, 1))
         self.pool1 = nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2))
 
@@ -30,7 +31,9 @@ class C3D(nn.Module):
 
         self.fc6 = nn.Linear(8192, 4096)
         self.fc7 = nn.Linear(4096, 4096)
-        self.fc8 = nn.Linear(4096, num_classes)
+
+        if not self.no_last:
+            self.fc8 = nn.Linear(4096, num_classes)
 
         self.dropout = nn.Dropout(p=0.5)
 
@@ -40,6 +43,28 @@ class C3D(nn.Module):
 
         if pretrained:
             self.__load_pretrained_weights()
+            if untrainable:
+                self.conv1.requires_grad = False
+                self.pool1.requires_grad = False
+
+                self.conv2.requires_grad = False
+                self.pool2.requires_grad = False
+
+                self.conv3a.requires_grad = False
+                self.conv3b.requires_grad = False
+                self.pool3.requires_grad = False
+
+                self.conv4a.requires_grad = False
+                self.conv4b.requires_grad = False
+                self.pool4.requires_grad = False
+
+                self.conv5a.requires_grad = False
+                self.conv5b.requires_grad = False
+                self.pool5.requires_grad = False
+
+                self.fc6.requires_grad = False
+                self.fc7.requires_grad = False
+                
 
     def forward(self, x):
 
@@ -67,7 +92,10 @@ class C3D(nn.Module):
         x = self.relu(self.fc7(x))
         x = self.dropout(x)
 
-        logits = self.fc8(x)
+        if not self.no_last:
+            logits = self.fc8(x)
+        else:
+            logits = x
 
         return logits
 
@@ -123,6 +151,8 @@ class C3D(nn.Module):
             elif isinstance(m, nn.BatchNorm3d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
+
+
 
 def get_1x_lr_params(model):
     """
