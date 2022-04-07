@@ -8,7 +8,7 @@ import logging
 
 path = "../datasets/hmdb51_tvl1_flow/tvl1_flow/"
 
-def get_classes(labels_file = "../dataloaders/labels/hmdb_labels.txt", skip_first_n = 32):
+def get_classes(labels_file = "../dataloaders/labels/hmdb_labels.txt", skip_first_n = 0):
     
     labels = []
 
@@ -64,7 +64,11 @@ def merge_u_v_into_image(path, file):
 
     b = b.point(lambda i: 127) # Average color is 127
 
-    return Image.merge('RGB', (r_u, g_v, b))
+    merged =  Image.merge('RGB', (r_u, g_v, b))
+
+    resized = merged.resize((171,128), Image.ANTIALIAS)
+
+    return resized
 
 def get_number_frames_in_clip(route, name):
     #print(f"La longitud es {len(os.listdir(route+'u/'+name))}")
@@ -82,15 +86,15 @@ def move_images(route,destination, class_name, split):
     split_name, split_files = split
 
     for name in (sbar := tqdm(split_files, leave=False)):
-        sbar.set_description("Processing %s" % name)
+        sbar.set_description("Processing %s" % name[:20])
         prepare_video_folders(destination , class_name,name, split_name)
 
         for frame in range(1, 1 + get_number_frames_in_clip(route, name)):
             #print(f"Estamos en el frame {frame}")
             #input("Pausa")
             merged_img = merge_u_v_into_image(route, name + f"/frame{frame:06d}.jpg")
-
-            merged_img.save(destination+ split_name+"/"+class_name+"/"+name +  f"/{frame:06d}.jpg")
+            frame_out = frame-1
+            merged_img.save(destination+ split_name+"/"+class_name+"/"+name +  f"/{frame_out:06d}.jpg")
 
 
 def prepare_base_folder(destination ):

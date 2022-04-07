@@ -59,7 +59,6 @@ class SplitExtractor:
             return get_kth(dataset, label, video_files)
 
 
-
 class VideoDataset(Dataset):
     r"""A Dataset for a folder of videos. Expects the directory structure to be
     directory->[train/val/test]->[class labels]->[videos]. Initializes with a list
@@ -91,6 +90,7 @@ class VideoDataset(Dataset):
                                ' You need to download it from official website.')
 
         if (not self.check_preprocess()) or preprocess:
+            input("Dataset will be preprocess. Are you okey with it?")
             print('Preprocessing of {} dataset, this will take long, but it will be done only once.'.format(dataset))
             if dataset == 'ucf101' or dataset == 'kth' or dataset =='hmdb51':
                 self.preprocess(custom_ttv = True)
@@ -144,8 +144,10 @@ class VideoDataset(Dataset):
     def check_preprocess(self):
         # TODO: Check image size in output_dir
         if not os.path.exists(self.output_dir):
+            print("Returning false 3")
             return False
         elif not os.path.exists(os.path.join(self.output_dir, 'train')):
+            print("Returning false 2")
             return False
 
         for ii, video_class in enumerate(os.listdir(os.path.join(self.output_dir, 'train'))):
@@ -153,7 +155,11 @@ class VideoDataset(Dataset):
                 video_name = os.path.join(os.path.join(self.output_dir, 'train', video_class, video),
                                     sorted(os.listdir(os.path.join(self.output_dir, 'train', video_class, video)))[0])
                 image = cv2.imread(video_name)
-                if np.shape(image)[0] != 128 or np.shape(image)[1] != 171:
+                if np.shape(image)[0] != 128 or (np.shape(image)[1] != 171 and np.shape(image)[1] != 172):
+                    print(f"Shape is {np.shape(image)}")
+                    print(f"Shape0 is {np.shape(image)[0]}")
+                    print(f"Shape1 is {np.shape(image)[1]}")
+                    print("Returning False")
                     return False
                 else:
                     break
@@ -295,7 +301,7 @@ class VideoDataset(Dataset):
         frame_count = len(frames)
         buffer = np.empty((frame_count, self.resize_height, self.resize_width, 3), np.dtype('float32'))
         for i, frame_name in enumerate(frames):
-            frame = np.array(cv2.imread(frame_name)).astype(np.float64)
+            frame = np.array(cv2.imread(frame_name)).astype(np.float64)[:, :171, :] # TODO cambiar, lo he puesto porque en vez de 171, en una he puesto 172..
             buffer[i] = frame
 
         return buffer

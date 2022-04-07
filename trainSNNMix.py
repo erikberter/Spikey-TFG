@@ -3,24 +3,13 @@ from datetime import datetime
 import socket
 import os
 import glob
+
+import torchvision.models as models
+
 from network.SNN_model import SNN_ModelT
+from network.own.C3NN_Base_model import C3DNN_Small
+from network.MixModels.mixer_models import MixClassification, MixModel, C3NN_Small_Mix, MixClassificationBig
 
-from network.SNN_Recurrent import SNNR_ModelT
-from network.norse.CSNN_model import CSNN_ModelT
-from network.norse.C3SNN_model import C3SNN_ModelT, C3DSNN_ModelT, C3DSNN_ModelT2, C3DSNN_C3D_ModelT, C3DSNN_Fire_ModelT
-from network.own.C3NN_Base_model import C3DNN, C3DNN_NB, C3DNN_Small, C3DNN_NB_Small, C3DNN_Small_Alt, C3DNN_Med_Alt
-
-from network.own.CNN_LSTM_Base_model import CNN_LSTM, CNN_LSTM_Alt
-
-from network.snntorch.C3SNN_SNN_model import C3SNN_SNNT_ModelT
-
-from network.SP_C3_NN import SP_NN
-
-from network.Mixed_C3D_model import Mixed_C3D
-
-
-from network.C3D_model import C3D
-from network.C3NN_model import C3NN_Mod
 from tqdm import tqdm
 
 import torch
@@ -30,6 +19,7 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
 from dataloaders.dataset import VideoDataset
+from dataloaders.MixDataset import MixedDataset
 
 import numpy as np
 
@@ -49,7 +39,7 @@ torch.set_printoptions(precision=3, sci_mode=False)
 nEpochs = 100  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 useTest = True # See evolution of the test set when training
-useVal = True
+useVal = False
 
 useWholeTimeSet = True
 
@@ -57,7 +47,7 @@ nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
 lr = 2e-4 # Learning rate
 
-dataset = 'hmdb51_flow' # Options: hmdb51 or ucf101
+dataset = 'hmdb51' # Options: hmdb51 or ucf101
 
 
 #########################
@@ -87,7 +77,7 @@ save_dir = os.path.join(save_dir_root, 'run', 'run_' + str(run_id))
 modelName = 'SNN_lite' # Options: C3D or R2Plus1D or R3D
 saveName = modelName + '-' + dataset
 
-def run_net(net, data, num_classes):
+def run_net(net, data_spa, data_flow, num_classes):
     """
         net (torch): SNN model
         data (torch.tensor): [batch_size, channels, timestep, height, width]
@@ -95,39 +85,32 @@ def run_net(net, data, num_classes):
     global device
     global useWholeTimeSet
 
-    cops = torch.zeros(data.shape[0],data.shape[2], num_classes).to(device)
-    data = torch.transpose(data, 1, 2)
+    cops = torch.zeros(data_spa.shape[0],data_spa.shape[2], num_classes).to(device)
+    data_spa = torch.transpose(data_spa, 1, 2)
+    data_flow = torch.transpose(data_flow, 1, 2)
     # Data shape is now [batch_size, timestep, channels, height, width]
-    data /= 255
+    data_spa /= 255
+    data_flow /= 255
 
     
     if useWholeTimeSet:
         # Comment if LSTM
-        data = torch.transpose(data, 1, 2)
+        data_spa = torch.transpose(data_spa, 1, 2)
+        data_flow = torch.transpose(data_flow, 1, 2)
         # Data shape is now [batch_size, channels, timestep, height, width]
-        cops = net(data)
+        cops = net(data_spa, data_flow)
     else:
-        for i in range(0, data.shape[1]):
+        for i in range(0, data_spa.shape[1]):
             torch.cuda.empty_cache()
-            #print(f"El minimo en los datos es {torch.min(data[:,i,:])}")
-            output = net(data[:,i,:])
-            #print(f"Output JEJE:\n {output}")
-            cops[:,i,:] += output
+            
+            #output = net(data[:,i,:])
+            
+            #cops[:,i,:] += output
         results = torch.as_tensor(cops)
         cops, _ = torch.max(results, 1)
-        #cops = torch.mean(results, 1)
-    #print(f"Outputs:\n {cops}\n")
-    #input("SANTA")
-    #_, preds = torch.max(cops, 1)
-    #print(f"\nDevolviendo: \n{cops}")
-    #q=""
-    #while len(q) == 0:
-    #    q = input("MMMM")
+        
     return cops
 
-def to_categorical(y, num_classes):
-    """ 1-hot encodes a tensor """
-    return np.eye(num_classes, dtype='uint8')[y.cpu()]
 
 def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=lr,
                 num_epochs=nEpochs, save_epoch=snapshot, useTest=useTest, test_interval=nTestInterval):
@@ -142,8 +125,13 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     #########################
     #         Model         #
     #########################
-    #model = C3DNN_Small_Alt(num_classes, True)
-    model = C3DNN_Small(num_classes)
+    spa_model = models.video.r3d_18(pretrained=True)
+    temp_model =models.video.r3d_18(pretrained=True)
+    mix_model = MixClassificationBig(400,num_classes)
+
+
+    model = MixModel(spa_model, temp_model, mix_model)
+    
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
@@ -151,16 +139,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
-    if resume_epoch == 0:
-        print("Training {} from scratch...".format(modelName))
-    else:
-        checkpoint = torch.load(os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar'),
-                       map_location=lambda storage, loc: storage)   # Load all tensors onto the CPU
-        print("Initializing weights from: {}...".format(
-            os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar')))
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['opt_dict'])
-
+    print("Training {} from scratch...".format(modelName))
+    
     print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
     model.to(device)
     criterion.to(device)
@@ -169,10 +149,11 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16, preprocess = False), batch_size=16, shuffle=True, num_workers=4)
+
+    train_dataloader = DataLoader(MixedDataset(dataset=dataset, split='train'), batch_size=6, shuffle=True, num_workers=4)
     if useVal:
-        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=16), batch_size=16, num_workers=4)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=16), batch_size=16, num_workers=4)
+        val_dataloader   = DataLoader(MixedDataset(dataset=dataset, split='val'), batch_size=6, num_workers=4)
+    test_dataloader  = DataLoader(MixedDataset(dataset=dataset, split='test'), batch_size=6, num_workers=4)
 
     if useVal:
         trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
@@ -205,7 +186,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
             for inputs, labels in tqdm(trainval_loaders[phase]):
                 # move inputs and labels to the device the training is taking place on
-                inputs = Variable(inputs, requires_grad=True).to(device)
+                inputs_spa = Variable(inputs[0], requires_grad=True).to(device)
+                inputs_flow = Variable(inputs[1], requires_grad=True).to(device)
                 labels = Variable(labels).to(device)
                 
                 #inputs = Variable(input_train, requires_grad=True).to(device)
@@ -216,11 +198,11 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 optimizer.zero_grad()
 
                 if phase == 'train':
-                    cops = run_net(model, inputs, num_classes)
+                    cops = run_net(model, inputs_spa, inputs_flow, num_classes)
                     
                 else:
                     with torch.no_grad():
-                        cops = run_net(model, inputs, num_classes)
+                        cops = run_net(model, inputs_spa, inputs_flow, num_classes)
 
                 preds = torch.max(cops, 1)[1]
                 
@@ -239,7 +221,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                     loss.backward()
                     optimizer.step()
 
-                running_loss += loss.item() * inputs.size(0)
+                running_loss += loss.item() * 2*inputs[0].size(0)
                 running_corrects += torch.sum(preds == labels)
 
             if trainval_sizes[phase] == 0:
@@ -274,21 +256,22 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             running_corrects = 0.0
 
             for inputs, labels in tqdm(test_dataloader):
-                inputs = inputs.to(device)
+                
+                inputs_spa = inputs[0].to(device)
+                inputs_flow = inputs[1].to(device)
                 labels = labels.to(device)
                 
                 labels_c = labels.clone().detach()
-                labels = torch.tensor(to_categorical(labels, num_classes)).to(device)
                 
                 with torch.no_grad():
-                    outputs = run_net(model, inputs,num_classes)
+                    outputs = run_net(model, inputs_spa, inputs_flow, num_classes)
                     
                 probs = nn.Softmax(dim=1)(outputs)
                 preds = torch.max(outputs, 1)[1]
                 
                 loss = criterion(outputs, labels_c.long())
 
-                running_loss += loss.item() * inputs.size(0)
+                running_loss += loss.item() * 2 * inputs[0].size(0)
                 running_corrects += torch.sum(preds == labels_c)
 
             epoch_loss = running_loss / test_size
