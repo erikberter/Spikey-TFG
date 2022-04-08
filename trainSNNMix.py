@@ -37,7 +37,7 @@ torch.set_printoptions(precision=3, sci_mode=False)
 #########################
 
 nEpochs = 100  # Number of epochs for training
-resume_epoch = 0  # Default is 0, change if want to resume
+resume_epoch = 5  # Default is 0, change if want to resume
 useTest = True # See evolution of the test set when training
 useVal = False
 
@@ -68,7 +68,7 @@ exp_name = os.path.dirname(os.path.abspath(__file__)).split('/')[-1]
 
 if resume_epoch != 0:
     runs = sorted(glob.glob(os.path.join(save_dir_root, 'run', 'run_*')))
-    run_id = int(runs[-1].split('_')[-1]) if runs else 0
+    run_id = 10#int(runs[-1].split('_')[-1]) if runs else 0
 else:
     runs = sorted(glob.glob(os.path.join(save_dir_root, 'run', 'run_*')))
     run_id = int(runs[-1].split('_')[-1]) + 1 if runs else 0
@@ -131,7 +131,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
 
 
     model = MixModel(spa_model, temp_model, mix_model)
-    
+    model.to(device) # Importante en caso de load despues
+
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
@@ -139,7 +140,15 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5,
                                           gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
-    print("Training {} from scratch...".format(modelName))
+    if resume_epoch == 0:
+        print("Training {} from scratch...".format(modelName))
+    else:
+        checkpoint = torch.load(os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar'),
+                       map_location=device)   # Load all tensors onto the CPU
+        print("Initializing weights from: {}...".format(
+            os.path.join(save_dir, 'models', saveName + '_epoch-' + str(resume_epoch - 1) + '.pth.tar')))
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['opt_dict'])
     
     print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
     model.to(device)
