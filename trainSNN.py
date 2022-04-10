@@ -18,6 +18,8 @@ from network.SP_C3_NN import SP_NN
 
 from network.Mixed_C3D_model import Mixed_C3D
 
+from network.CNN_Norse_model import ResNet_SNN
+
 
 from network.C3D_model import C3D
 from network.C3NN_model import C3NN_Mod
@@ -57,7 +59,7 @@ nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
 lr = 2e-4 # Learning rate
 
-dataset = 'hmdb51_flow' # Options: hmdb51 or ucf101
+dataset = 'ucf101' # Options: hmdb51 or ucf101
 
 
 #########################
@@ -84,7 +86,7 @@ else:
     run_id = int(runs[-1].split('_')[-1]) + 1 if runs else 0
 
 save_dir = os.path.join(save_dir_root, 'run', 'run_' + str(run_id))
-modelName = 'SNN_lite' # Options: C3D or R2Plus1D or R3D
+modelName = 'ResNet_SNN' # Options: C3D or R2Plus1D or R3D
 saveName = modelName + '-' + dataset
 
 def run_net(net, data, num_classes):
@@ -116,7 +118,9 @@ def run_net(net, data, num_classes):
         results = torch.as_tensor(cops)
         cops, _ = torch.max(results, 1)
         #cops = torch.mean(results, 1)
-    #print(f"Outputs:\n {cops}\n")
+    #print(net.print_params())
+    #print(f"Outputs:\n {cops[0]}\n")
+    #print("###################")
     #input("SANTA")
     #_, preds = torch.max(cops, 1)
     #print(f"\nDevolviendo: \n{cops}")
@@ -143,7 +147,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     #         Model         #
     #########################
     #model = C3DNN_Small_Alt(num_classes, True)
-    model = C3DNN_Small(num_classes)
+    model = ResNet_SNN(num_classes)
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
@@ -257,6 +261,7 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
             print("[{}] Epoch: {}/{} Loss: {} Acc: {}".format(phase, epoch+1, nEpochs, epoch_loss, epoch_acc))
             stop_time = timeit.default_timer()
             print("Execution time: " + str(stop_time - start_time) + "\n")
+            model.print_params()
 
         if epoch % save_epoch == (save_epoch - 1):
             torch.save({

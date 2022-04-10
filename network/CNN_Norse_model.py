@@ -8,6 +8,8 @@ from norse.torch.module.encode import ConstantCurrentLIFEncoder
 from norse.torch.module.lif import LIFRecurrentCell, LIFCell
 from norse.torch.module.leaky_integrator import LILinearCell
 
+import torchvision.models as models
+
 class CNN_Norse_model(nn.Module):
     def __init__(self, n_classes):
         super(CNN_Norse_model, self).__init__()
@@ -84,6 +86,7 @@ class CNN_Norse_model(nn.Module):
         self.rewards = []
 
     def forward(self, x):
+        
         voltages = torch.empty(
             self.seq_length, x.shape[0], self.n_classes, device=x.device, dtype=x.dtype
         )
@@ -109,5 +112,74 @@ class CNN_Norse_model(nn.Module):
         y_hat, _ = torch.max(voltages, 0)
         
         y_hat = torch.nn.functional.softmax(y_hat, dim=1)
+        
+        return y_hat
+
+
+
+class ResNet_SNN(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_SNN, self).__init__()
+        self.state_dim = 4
+        self.input_features = 16
+        self.hidden_features = 128
+        self.output_features = 2
+        self.seq_length = 24
+        self.n_classes = n_classes
+        self.uses_ts = False
+        self.constant_current_encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.33))
+
+        self.features = models.video.r3d_18(pretrained=True)
+        for param in self.features.parameters():
+            param.requires_grad = False
+
+        self.classification = SequentialState(
+            
+            nn.Linear(400, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.2),
+            nn.Linear(128, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.2),
+            nn.Linear(128, 128, bias=False),
+            LILinearCell(128, n_classes, p),
+        )
+
+        self.relu = nn.ReLU()
+        
+        self.saved_log_probs = []
+        self.rewards = []
+
+        self.feature_scalar = torch.nn.Parameter(torch.ones(1)) 
+        self.encoder_scalar = torch.nn.Parameter(torch.ones(1))
+
+    def print_params(self):
+        print(f"Feature Scalar {self.feature_scalar}")
+        print(f"Encoder Scalar {self.encoder_scalar}")
+
+    def forward(self, x):
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        out = 2 * self.feature_scalar * self.features(x)
+        out_f = torch.flatten(out, start_dim=1)
+        #out_f = self.relu(out_f)
+        #print(f"La media en feature es de {torch.mean(out_f)}")
+        #input("Pausa")
+        encoded = 5 * self.encoder_scalar * self.constant_current_encoder(out_f)
+
+        sc = None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :] 
+            #print(f"La media en {ts} es de {torch.mean(z)}")
+            #input("Pausa")
+            out_c, sc = self.classification(z, sc)
+            voltages[ts, :, :] = out_c
+        
+        y_hat = voltages[-1]
         
         return y_hat

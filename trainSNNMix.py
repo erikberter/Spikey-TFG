@@ -74,7 +74,7 @@ else:
     run_id = int(runs[-1].split('_')[-1]) + 1 if runs else 0
 
 save_dir = os.path.join(save_dir_root, 'run', 'run_' + str(run_id))
-modelName = 'SNN_lite' # Options: C3D or R2Plus1D or R3D
+modelName = 'Resnet_SNN' # Options: C3D or R2Plus1D or R3D
 saveName = modelName + '-' + dataset
 
 def run_net(net, data_spa, data_flow, num_classes):
