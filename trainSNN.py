@@ -66,7 +66,7 @@ dataset = 'ucf101' # Options: hmdb51 or ucf101
 #      N. Classes       #
 #########################
 
-dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51, 'kth' : 6, 'ucf101': 101}
+dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101}
 
 if dataset in dataset_classes:
     num_classes = dataset_classes[dataset]
