@@ -6,19 +6,10 @@ import os, os.path
 
 import logging
 
+from scripts.data_preparation.utils import get_classes, prepare_base_folder, prepare_classes_folders
+from scripts.data_preparation.utils import merge_u_v_into_image
+
 path = "../datasets/hmdb51_tvl1_flow/tvl1_flow/"
-
-def get_classes(labels_file = "../dataloaders/labels/hmdb_labels.txt", skip_first_n = 0):
-    
-    labels = []
-
-    with open(labels_file, "r") as file:
-        for i, line in enumerate(file):
-            if i < skip_first_n:
-                continue
-            labels += [line.split()[1]]
-
-    return labels
 
 
 def get_class_split(split_dir, class_name, split ="1"):
@@ -47,29 +38,6 @@ def get_class_split(split_dir, class_name, split ="1"):
 
     return ('val', names[0]), ('train', names[1]), ('test', names[2])
 
-
-def merge_u_v_into_image(path, file):
-    """
-        Merges the u and v component from grayscales to a image with 3 channels.
-
-        path = ../datasets/hmdb51_tvl1_flow/tvl1_flow/
-        file = #20_Rhythm_clap_u_nm_np1_fr_goo_0/frame000055.jpg
-    """
-
-    u_img = Image.open(path + "u/" + file).convert('RGB') 
-    v_img = Image.open(path + "v/" + file).convert('RGB') 
-
-    r_u, _, _ = u_img.split()
-    _, g_v, b = v_img.split()
-
-    b = b.point(lambda i: 127) # Average color is 127
-
-    merged =  Image.merge('RGB', (r_u, g_v, b))
-
-    resized = merged.resize((171,128), Image.ANTIALIAS)
-
-    return resized
-
 def get_number_frames_in_clip(route, name):
     #print(f"La longitud es {len(os.listdir(route+'u/'+name))}")
     #print(f"La ruta es {route+'u/'+name}")
@@ -97,20 +65,6 @@ def move_images(route,destination, class_name, split):
             merged_img.save(destination+ split_name+"/"+class_name+"/"+name +  f"/{frame_out:06d}.jpg")
 
 
-def prepare_base_folder(destination ):
-    for i in ["train", "test", "val"]:
-        if not os.path.exists(destination + i):
-            os.mkdir(destination + i)
-
-    pass
-
-def prepare_classes_folders(destination, class_name):
-    for i in ["train", "test", "val"]:
-        if not os.path.exists(destination + i+ "/" + class_name):
-            os.mkdir(destination + i + "/" + class_name)
-
-    pass
-
 def prepare_video_folders(destination, class_name, video_name, split):
     if not os.path.exists(destination + split+ "/" + class_name + "/" + video_name):
         os.mkdir(destination + split + "/" + class_name + "/" + video_name)
@@ -127,7 +81,7 @@ def prepare(split_id = 1, route = "", destination = ""):
     prepare_base_folder(destination)
     
 
-    classes = get_classes()
+    classes = get_classes("../../dataloaders/labels/hmdb_labels.txt")
     
     for class_i in (pbar := tqdm(classes)):
         pbar.set_description("Processing %s" % class_i)

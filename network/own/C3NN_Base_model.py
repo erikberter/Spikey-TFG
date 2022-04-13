@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torchvision.models as models
 
 
 class C3DNN(nn.Module):
@@ -316,4 +317,39 @@ class C3DNN_NB(nn.Module):
 
     def forward(self, x):
         return self.features(x)
-    
+
+
+class ResNet_CNN(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_CNN, self).__init__()
+        
+        self.n_classes = n_classes
+        self.uses_ts = False
+
+        self.features = models.video.r3d_18(pretrained=True)
+        for param in self.features.parameters():
+            param.requires_grad = False
+
+        self.classification = nn.Sequential(
+            
+            nn.Linear(400, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, n_classes, bias=True),
+        )
+
+        
+
+    def forward(self, x):
+        
+
+        out = self.features(x)
+        
+        out = self.classification(out)
+        return out
