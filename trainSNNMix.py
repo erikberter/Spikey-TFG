@@ -37,7 +37,7 @@ torch.set_printoptions(precision=3, sci_mode=False)
 #########################
 
 nEpochs = 100  # Number of epochs for training
-resume_epoch = 5  # Default is 0, change if want to resume
+resume_epoch = 0  # Default is 0, change if want to resume
 useTest = True # See evolution of the test set when training
 useVal = False
 
@@ -47,14 +47,14 @@ nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
 lr = 2e-4 # Learning rate
 
-dataset = 'hmdb51' # Options: hmdb51 or ucf101
+dataset = 'ucf101' # Options: hmdb51 or ucf101
 
 
 #########################
 #      N. Classes       #
 #########################
 
-dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51, 'kth' : 6, 'ucf101': 101}
+dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51, 'ucf101_flow' : 101, 'kth' : 6, 'ucf101': 101}
 
 if dataset in dataset_classes:
     num_classes = dataset_classes[dataset]
@@ -86,17 +86,16 @@ def run_net(net, data_spa, data_flow, num_classes):
     global useWholeTimeSet
 
     cops = torch.zeros(data_spa.shape[0],data_spa.shape[2], num_classes).to(device)
-    data_spa = torch.transpose(data_spa, 1, 2)
-    data_flow = torch.transpose(data_flow, 1, 2)
+
     # Data shape is now [batch_size, timestep, channels, height, width]
     data_spa /= 255
     data_flow /= 255
 
     
     if useWholeTimeSet:
-        # Comment if LSTM
-        data_spa = torch.transpose(data_spa, 1, 2)
-        data_flow = torch.transpose(data_flow, 1, 2)
+        # UnComment if LSTM
+        # data_spa = torch.transpose(data_spa, 1, 2)
+        # data_flow = torch.transpose(data_flow, 1, 2)
         # Data shape is now [batch_size, channels, timestep, height, width]
         cops = net(data_spa, data_flow)
     else:

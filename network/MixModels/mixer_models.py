@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+import torchvision.models as models
 
 class MixClassification(nn.Module):
     """
@@ -202,3 +203,28 @@ class C3NN_Small_Mix(nn.Module):
         x_6 = torch.flatten(x_6, start_dim=1)
 
         return x_6
+
+
+class MixModelDefault(nn.Module):
+    """
+        Mixer model composed of spatial, temporal and fusion models
+    """
+
+    def __init__(self, num_classes, debug = False):
+        super(MixModelDefault, self).__init__()
+
+        self.debug = debug
+
+        self.spatial =  models.video.r3d_18(pretrained=True)
+        self.temporal =  models.video.r3d_18(pretrained=True)
+        self.fusion = MixClassificationBig(400,num_classes)
+
+
+
+    def forward(self, x):
+
+        x_spa = self.spatial(x[0])
+        x_temp = self.temporal(x[1])
+
+        x_res = torch.cat((x_spa, x_temp), 1)
+        return self.fusion(x_res)

@@ -30,6 +30,13 @@ class Path(object):
             output_dir = 'datasets\\HMDB51_Flow'
 
             return root_dir, output_dir
+        elif database == 'ucf101_flow':
+            # folder that contains class labels
+            root_dir = 'datasets\\UFC101\\UCF101\\UCF-101'
+
+            output_dir = 'datasets\\UCF101_Flow'
+
+            return root_dir, output_dir
         else:
             print('Database {} not available.'.format(database))
             raise NotImplementedError

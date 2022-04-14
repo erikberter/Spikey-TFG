@@ -61,8 +61,8 @@ def get_class_split(split_dir, class_name, split ="1"):
     test_split_path = split_dir + "testlist0" + split + ".txt"
     
     with open(test_split_path, "r") as file:
-
-        for line in file:
+        class_name_f =  "_" + line + "_"
+        for class_name_f in file:
             if class_name in line:
                 video_name = line.split("/")[1].split(".")[0]
                 test += [video_name]
