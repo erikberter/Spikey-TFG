@@ -4,6 +4,11 @@ import socket
 import os
 import glob
 
+from configparser import ConfigParser
+
+from yaml import parse
+
+
 from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small
 from network.MixModels.mixer_models import MixModelDefault
 
@@ -57,7 +62,7 @@ save_dir_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 
 # Antes habia ID's, pero no no funcionaba y todas estaban en la 11.
 # Voy a empezar a poner todas en la 42
-save_dir = os.path.join(save_dir_root, 'run', 'run_42')
+save_dir = os.path.join(save_dir_root, 'run', 'run_43')
 
 
 
@@ -233,8 +238,13 @@ def test_model(epoch, model, num_classes, test_dataloader, criterion, writer,  i
     
 
 def save_model(epoch, model, optimizer, save_name, save_dir):
+    global config
+
     save_path = os.path.join(save_dir, 'models', save_name + '_epoch-' + str(epoch) + '.pth.tar')
     
+    config['session']['last_epoch'] = str(epoch)
+    save_config()
+
     torch.save({
         'epoch': epoch + 1,
         'state_dict': model.state_dict(),
@@ -303,6 +313,7 @@ def train_session_model(
     """
     global device
     global save_dir
+    global config
 
     if dataset in dataset_classes:
         num_classes = dataset_classes[dataset]
@@ -378,18 +389,60 @@ def train_session_model(
     writer.close()
 
 
-if __name__ == "__main__":
-    # List of running sessions
-    # Elements of the list must be on the shape of
-    #   (Name, model, dataset, model_params, dataset_params)
-    #   (Name, model, dataset, 'lr', epochs, save_epoch,  useTest, test_interval,  resume_epoch,{clip_len, batch_size})
+# List of running sessions
+# Elements of the list must be on the shape of
+#   (Name, model, dataset, model_params, dataset_params)
+#   (Name, model, dataset, 'lr', epochs, save_epoch,  useTest, test_interval,  resume_epoch,{clip_len, batch_size})
     
-    train_models = [
-        (("ResNet_2CNN", MixModelDefault, "hmdb51", 2e-4, 20, 2,  True, 5), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
-        (("ResNet_CNN", C3DNN_Small, "kth", 2e-4, 20, 5,  True, 5), {'resume_epoch' : 10}),
-        (("ResNet_CNN", ResNet_CNN, "hmdb51", 2e-4, 20, 2,  True, 5), {}),
-        (("ResNet_CNN", C3DNN_Small, "ufc101", 2e-4, 20, 5,  True, 5), {}),
-    ]
+train_models = [
+    (("Small_CNN", C3DNN_Small, "kth", 2e-4, 20, 5,  True, 2), {}),
+    (("Small_CNN", C3DNN_Small, "hmdb51", 2e-4, 20, 5,  True, 2), {}),
+    (("Small_CNN", C3DNN_Small, "ucf101", 2e-4, 20, 5,  True, 2), {}),
+    (("ResNet_CNN", ResNet_CNN, "kth", 2e-4, 20, 5,  True, 2), {}),
+    (("ResNet_CNN", ResNet_CNN, "hmdb51", 2e-4, 20, 2,  True, 2), {}),
+    (("ResNet_CNN", ResNet_CNN, "ufc101", 2e-4, 20, 5,  True, 2), {}),
+    (("ResNet_2CNN", MixModelDefault, "hmdb51", 2e-4, 20, 2,  True, 5), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+]
 
-    for model_params in train_models:
+
+def prepare_config():
+    config = ConfigParser()
+    
+    if not os.path.exists('auto_session.ini'):
+        config.add_section('session')
+        config.set('session', 'last_model', '0')
+        config.set('session', 'last_epoch', '0')
+        save_config_pre(config)
+    else:
+        config.read('auto_session.ini')
+    
+    return config
+
+def save_config():
+    global config
+    with open('auto_session.ini', 'w') as configfile:
+        config.write(configfile)
+
+def save_config_pre(config = None):
+    with open('auto_session.ini', 'w') as configfile:
+        config.write(configfile)
+
+if __name__ == "__main__":
+    
+    config = prepare_config()
+    
+    for i, model_params in enumerate(train_models):
+
+        if int(config['session']['last_model']) > i:
+            continue
+        if int(config['session']['last_model']) == i:
+            print("Loading from resumed epoch")
+            model_params[1]['resume_epoch'] = int(config['session']['last_epoch'])
+
         train_session_model(*model_params[0], **model_params[1])
+
+        config['last_model'] = str(int(config['session']['last_model']) + 1)
+        config['last_epoch'] = '0'
+        
+        save_config()
+
