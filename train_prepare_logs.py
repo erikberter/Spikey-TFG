@@ -441,8 +441,8 @@ if __name__ == "__main__":
 
         train_session_model(*model_params[0], **model_params[1])
 
-        config['last_model'] = str(int(config['session']['last_model']) + 1)
-        config['last_epoch'] = '0'
+        config['session']['last_model'] = str(int(config['session']['last_model']) + 1)
+        config['session']['last_epoch'] = '0'
         
         save_config()
 
