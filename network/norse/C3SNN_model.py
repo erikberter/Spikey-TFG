@@ -34,37 +34,47 @@ class SNN_Model_a(nn.Module):
         self.uses_ts = uses_ts
         self.debug = debug
 
-
-
-        #self.classification = SequentialState(
-        #    LILinearCell(1024, n_classes, p),
-        #)
-
-
-        #self.classification = SequentialState(
-        #    nn.Linear(768, 128, bias = False),
-        #    LIFCell(p),
-        #    nn.Linear(128, 32, bias = False),
-        #    LIFCell(p),
-        #    nn.Linear(32, self.n_classes, bias = False),
-        #    LICell(dt = 0.001),
-        #)
-        
-
-        #self.classification = SequentialState(
-        #    nn.Linear(1024, 256, bias = False),
-        #    LIFCell(p),
-        #    LILinearCell(256, n_classes, p),
-        #)
-
-        #self.classification = nn.Sequential(
-        #    nn.Linear(1024, n_classes, bias = False),
-            #nn.ReLU(),
-            #nn.Dropout(0.3),
-            #nn.Linear(256, n_classes)
-        #)
         self.classification = SequentialState(
             nn.Linear(1152, 512),
+            LIFCell(p),
+            nn.Dropout(0.2),
+            nn.Linear(512, 256),
+            LIFCell(p),
+            nn.Dropout(0.2),
+            LILinearCell(256, n_classes, p),
+        )
+
+    def forward(self, x):
+        #return self.classification(x)
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        sc = None
+        for ts in range(self.seq_length):
+            z = x[ts, :] if self.uses_ts else x
+
+            out_c, sc = self.classification(z, sc)
+
+            voltages[ts, :, :] = out_c
+
+        return voltages
+
+
+class SNN_Model_b(nn.Module):
+
+    def __init__(self, n_classes, seq_length, p, uses_ts = False, debug = False):
+        super(SNN_Model_b, self).__init__()
+        self.seq_length = seq_length
+        self.n_classes = n_classes
+
+        self.uses_ts = uses_ts
+        self.debug = debug
+
+        self.classification = SequentialState(
+            nn.Linear(1024, 512),
             LIFCell(p),
             nn.Dropout(0.2),
             nn.Linear(512, 256),
@@ -139,7 +149,7 @@ class C3DSNN_Base(nn.Module):
 
 
 class C3SNN_ModelT(nn.Module):
-    def __init__(self, n_classes, use_encoder = False):
+    def __init__(self, n_classes, use_encoder = True):
         super(C3SNN_ModelT, self).__init__()
         
         seq_length = 32
@@ -155,7 +165,7 @@ class C3SNN_ModelT(nn.Module):
         self.encoder_scaler = 1
 
         self.cnn = C3NN_Feature_Extractor(debug= self.debug)
-        self.snn = SNN_Model_a(n_classes, seq_length, p, uses_ts=use_encoder, debug= self.debug)
+        self.snn = SNN_Model_b(n_classes, seq_length, p, uses_ts=use_encoder, debug= self.debug)
 
         self.decoder = decode
 
@@ -165,8 +175,8 @@ class C3SNN_ModelT(nn.Module):
         if self.debug:
             #print(f"CNN {x[0][:20]}")
             print(f"CNN {x.shape}")
-        #if self.use_encoder:
-        #    x = self.encoder_scaler * self.encoder(x)
+        if self.use_encoder:
+            x = self.encoder_scaler * self.encoder(x)
         if self.debug:
             #print(f"Encoder {x[7][0][:20]}")
             print(f"CNN {x.shape}")
@@ -174,13 +184,98 @@ class C3SNN_ModelT(nn.Module):
         if self.debug:
             print(f"SNN {x[:,0,:]}")
             print(f"SNN {x.shape}")
-        #x = self.decoder(x)
+        x = self.decoder(x)
         if self.debug:
             print(f"Decoder {x}")
             print(f"Decoder {x.shape}")
             input("Pause")
         return x 
 
+
+class C3SNN_ModelT_scaled(nn.Module):
+    def __init__(self, n_classes, use_encoder = True):
+        super(C3SNN_ModelT_scaled, self).__init__()
+        
+        seq_length = 32
+        p = LIFParameters(v_th=torch.as_tensor(0.4))
+        self.debug = False
+        self.use_encoder = use_encoder
+        self.encoder = ConstantCurrentLIFEncoder(seq_length)
+
+        ## Network Parameters
+
+        # Scales the CNN output by a factor to improve the ConstantCurrentLIFEncoder Input
+        self.cnn_scaler = 5
+        self.encoder_scaler = 2
+
+        self.cnn = C3NN_Feature_Extractor(debug= self.debug)
+        self.snn = SNN_Model_b(n_classes, seq_length, p, uses_ts=use_encoder, debug= self.debug)
+
+        self.decoder = decode
+
+    def forward(self, x):
+        
+        x = self.cnn_scaler * self.cnn(x)
+        if self.debug:
+            #print(f"CNN {x[0][:20]}")
+            print(f"CNN {x.shape}")
+        if self.use_encoder:
+            x = self.encoder_scaler * self.encoder(x)
+        if self.debug:
+            #print(f"Encoder {x[7][0][:20]}")
+            print(f"CNN {x.shape}")
+        x = self.snn(x)
+        if self.debug:
+            print(f"SNN {x[:,0,:]}")
+            print(f"SNN {x.shape}")
+        x = self.decoder(x)
+        if self.debug:
+            print(f"Decoder {x}")
+            print(f"Decoder {x.shape}")
+            input("Pause")
+        return x 
+
+class C3SNN_ModelT_No_Encoder(nn.Module):
+    def __init__(self, n_classes, use_encoder = False):
+        super(C3SNN_ModelT_No_Encoder, self).__init__()
+        
+        seq_length = 32
+        p = LIFParameters(v_th=torch.as_tensor(0.4))
+        self.debug = False
+        self.use_encoder = use_encoder
+        self.encoder = ConstantCurrentLIFEncoder(seq_length)
+
+        ## Network Parameters
+
+        # Scales the CNN output by a factor to improve the ConstantCurrentLIFEncoder Input
+        self.cnn_scaler = 5
+        self.encoder_scaler = 2
+
+        self.cnn = C3NN_Feature_Extractor(debug= self.debug)
+        self.snn = SNN_Model_b(n_classes, seq_length, p, uses_ts=use_encoder, debug= self.debug)
+
+        self.decoder = decode
+
+    def forward(self, x):
+        
+        x = self.cnn_scaler * self.cnn(x)
+        if self.debug:
+            #print(f"CNN {x[0][:20]}")
+            print(f"CNN {x.shape}")
+        
+        if self.debug:
+            #print(f"Encoder {x[7][0][:20]}")
+            print(f"CNN {x.shape}")
+        x = self.snn(x)
+        if self.debug:
+            print(f"SNN {x[:,0,:]}")
+            print(f"SNN {x.shape}")
+        x = self.decoder(x)
+        if self.debug:
+            print(f"Decoder {x}")
+            print(f"Decoder {x.shape}")
+            input("Pause")
+        return x 
 
 
 class C3DSNN_ModelT(nn.Module):

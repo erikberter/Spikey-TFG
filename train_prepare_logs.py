@@ -11,7 +11,8 @@ from yaml import parse
 
 from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small
 from network.MixModels.mixer_models import MixModelDefault
-
+from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled
+from network.CNN_Norse_model import ResNet_SNN
 
 from tqdm import tqdm
 
@@ -52,7 +53,7 @@ useWholeTimeSet = True
 #      N. Classes       #
 #########################
 
-dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101}
+dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101, 'kth_rbg_diff' : 6}
 
 
 
@@ -242,7 +243,7 @@ def save_model(epoch, model, optimizer, save_name, save_dir):
 
     save_path = os.path.join(save_dir, 'models', save_name + '_epoch-' + str(epoch) + '.pth.tar')
     
-    config['session']['last_epoch'] = str(epoch)
+    config['session']['last_epoch'] = str(epoch + 1)
     save_config()
 
     torch.save({
@@ -400,8 +401,19 @@ train_models = [
     (("Small_CNN", C3DNN_Small, "ucf101", 2e-4, 20, 5,  True, 2), {}),
     (("ResNet_CNN", ResNet_CNN, "kth", 2e-4, 20, 5,  True, 2), {}),
     (("ResNet_CNN", ResNet_CNN, "hmdb51", 2e-4, 20, 2,  True, 2), {}),
-    (("ResNet_CNN", ResNet_CNN, "ufc101", 2e-4, 20, 5,  True, 2), {}),
-    (("ResNet_2CNN", MixModelDefault, "hmdb51", 2e-4, 20, 2,  True, 5), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_CNN", ResNet_CNN, "ucf101", 2e-4, 20, 2,  True, 2), {}),
+    (("C3SNN_Normal", C3SNN_ModelT, "kth", 2e-4, 20, 5, True, 2), {}),
+    (("C3SNN_Scaled", C3SNN_ModelT_scaled, "kth", 2e-4, 20, 5, True, 2), {}),
+    (("C3SNN_Normal", C3SNN_ModelT, "hmdb51", 2e-4, 20, 5, True, 2), {}),
+    (("C3SNN_Scaled", C3SNN_ModelT_scaled, "hmdb51", 2e-4, 20, 5, True, 2), {}),
+    (("C3SNN_Normal", C3SNN_ModelT, "ucf101", 2e-4, 20, 5, True, 2), {}),
+    (("C3SNN_Scaled", C3SNN_ModelT_scaled, "ucf101", 2e-4, 20, 5, True, 2), {}),
+    (("ResNet_SNN", ResNet_SNN, "kth", 2e-4, 20, 5, True, 2), {}),
+    (("ResNet_SNN", ResNet_SNN, "hmdb51", 2e-4, 20, 3, True, 2), {}),
+    (("ResNet_SNN", ResNet_SNN, "ucf101", 2e-4, 20, 2, True, 2), {}),
+    (("Small_CNN", C3DNN_Small, "kth_rbg_diff", 2e-4, 20, 5,  True, 2), {}),
+    (("C3SNN_Normal", C3SNN_ModelT, "kth_rbg_diff", 2e-4, 20, 5, True, 2), {}),
+    #(("ResNet_2CNN", MixModelDefault, "hmdb51", 2e-4, 20, 2,  True, 5), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
 ]
 
 
@@ -432,7 +444,7 @@ if __name__ == "__main__":
     config = prepare_config()
     
     for i, model_params in enumerate(train_models):
-
+        print(f" Act {i} _ {model_params[0][0]} _ {model_params[0][2]}")
         if int(config['session']['last_model']) > i:
             continue
         if int(config['session']['last_model']) == i:

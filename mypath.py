@@ -37,6 +37,13 @@ class Path(object):
             output_dir = 'datasets\\UCF101_Flow'
 
             return root_dir, output_dir
+        elif database == 'kth_rbg_diff':
+            # folder that contains class labels
+            root_dir = 'datasets\\KTH\\Processed'
+
+            output_dir = 'datasets\\KTH_RGB_Diff'
+
+            return root_dir, output_dir
         else:
             print('Database {} not available.'.format(database))
             raise NotImplementedError
