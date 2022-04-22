@@ -37,23 +37,40 @@ class SNN_Model_a(nn.Module):
             LILinearCell(1024, n_classes, p),
         )
 
-
-        #self.classification = SequentialState(
-        #    nn.Linear(768, 128, bias = False),
-        #    LIFCell(p),
-        #    nn.Linear(128, 32, bias = False),
-        #    LIFCell(p),
-        #    nn.Linear(32, self.n_classes, bias = False),
-        #    LICell(dt = 0.001),
-        #)
+    def forward(self, x):
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
         
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
 
-        #self.classification = SequentialState(
-        #    nn.Linear(1024, 256, bias = False),
-        #    LIFCell(p),
-        #    nn.Linear(256, 64, bias = False),
-        #    LILinearCell(64, n_classes, p),
-        #)
+        sc = None
+        for ts in range(self.seq_length):
+            z = x[ts, :] if self.uses_ts else x
+
+            out_c, sc = self.classification(z, sc)
+
+            voltages[ts, :, :] = out_c
+
+        return voltages
+
+
+
+class SNN_Model_Mix(nn.Module):
+
+    def __init__(self, n_classes, seq_length, p, uses_ts = False, debug = False):
+        super(SNN_Model_Mix, self).__init__()
+        self.seq_length = seq_length
+        self.n_classes = n_classes
+
+        self.uses_ts = uses_ts
+        self.debug = debug
+
+
+
+        self.classification = SequentialState(
+            LILinearCell(1024, n_classes, p),
+        )
 
     def forward(self, x):
         batch_size = x.shape[1] if self.uses_ts else x.shape[0]
@@ -71,6 +88,8 @@ class SNN_Model_a(nn.Module):
             voltages[ts, :, :] = out_c
 
         return voltages
+
+
 
 
 class CSNN_ModelT(nn.Module):

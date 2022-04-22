@@ -144,10 +144,8 @@ class VideoDataset(Dataset):
     def check_preprocess(self):
         # TODO: Check image size in output_dir
         if not os.path.exists(self.output_dir):
-            print("Returning false 3")
             return False
         elif not os.path.exists(os.path.join(self.output_dir, 'train')):
-            print("Returning false 2")
             return False
 
         for ii, video_class in enumerate(os.listdir(os.path.join(self.output_dir, 'train'))):
@@ -156,10 +154,6 @@ class VideoDataset(Dataset):
                                     sorted(os.listdir(os.path.join(self.output_dir, 'train', video_class, video)))[0])
                 image = cv2.imread(video_name)
                 if np.shape(image)[0] != 128 or (np.shape(image)[1] != 171 and np.shape(image)[1] != 172):
-                    print(f"Shape is {np.shape(image)}")
-                    print(f"Shape0 is {np.shape(image)[0]}")
-                    print(f"Shape1 is {np.shape(image)[1]}")
-                    print("Returning False")
                     return False
                 else:
                     break

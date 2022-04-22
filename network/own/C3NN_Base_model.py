@@ -58,7 +58,7 @@ class C3DNN_Small(nn.Module):
     """
 
 
-    def __init__(self, n_classes,  debug = False):
+    def __init__(self, n_classes, debug = False):
         super(C3DNN_Small, self).__init__()
 
         self.debug = debug
@@ -353,3 +353,92 @@ class ResNet_CNN(nn.Module):
         
         out = self.classification(out)
         return out
+
+class RPlus_CNN(nn.Module):
+    def __init__(self, n_classes):
+        super(RPlus_CNN, self).__init__()
+        
+        self.n_classes = n_classes
+        self.uses_ts = False
+
+        self.features = models.video.r2plus1d_18(pretrained=True)
+        
+        self.classification = nn.Sequential(
+            
+            nn.Linear(400, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, n_classes, bias=True),
+        )
+
+        
+
+    def forward(self, x):
+        
+
+        out = self.features(x)
+        
+        out = self.classification(out)
+        return out
+
+class C3DNN_Small_T(nn.Module):
+    """
+        Conv3D NN Model to extract features from image.
+
+        Just to have a viable first dense layer
+    """
+
+
+    def __init__(self, n_classes,  morelinear = 2, debug = False):
+        super(C3DNN_Small_T, self).__init__()
+
+        self.debug = debug
+
+        self.features = nn.Sequential(
+            nn.Conv3d(3, 64, kernel_size= (3,7,7), stride=2, padding=(1,3,3)),
+            nn.ReLU(),
+            nn.Conv3d(64, 64, kernel_size=(3,5,5), stride=1, padding=(1,2,2)),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+            
+            nn.MaxPool3d(2),
+            nn.Dropout(0.25),
+            
+            nn.Conv3d(64, 64, kernel_size=(3,7,7), stride=1, padding=(1,3,3)),
+            nn.ReLU(),
+            nn.Conv3d(64, 64, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+
+            nn.MaxPool3d(2),
+            nn.Dropout(0.25),
+
+            nn.Conv3d(64, 128, kernel_size=(3,3,3), stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(128, 128, kernel_size=(1,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(128),
+            
+            nn.MaxPool3d(2),
+            nn.Dropout(0.25),
+
+            nn.Flatten(),
+            nn.Linear(1152 * morelinear, 256),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(256, n_classes),
+        )
+
+
+
+    def forward(self, x):
+        return self.features(x)

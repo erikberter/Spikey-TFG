@@ -9,10 +9,11 @@ from configparser import ConfigParser
 from yaml import parse
 
 
-from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small
+from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small, RPlus_CNN
 from network.MixModels.mixer_models import MixModelDefault
-from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled
-from network.CNN_Norse_model import ResNet_SNN
+from network.MixModels.mixer_models_SNN import MixModelDefaultSNN
+from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled, C3SNN_ModelT_paramed, C3DSNN_Whole
+from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale
 
 from tqdm import tqdm
 
@@ -47,27 +48,20 @@ useVal = True
 
 useWholeTimeSet = True
 
-
-
 #########################
 #      N. Classes       #
 #########################
 
-dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101, 'kth_rbg_diff' : 6}
-
+dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101, 'kth_rbg_diff' : 6, 
+        'hmdb51_rbg_diff' : 51, 'kith_small':2, 'kith_rgb_small':2}
 
 
 
 save_dir_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Antes habia ID's, pero no no funcionaba y todas estaban en la 11.
 # Voy a empezar a poner todas en la 42
 save_dir = os.path.join(save_dir_root, 'run', 'run_43')
-
-
-
-
 
 def run_net(net, data, num_classes):
     """
@@ -87,7 +81,6 @@ def run_net(net, data, num_classes):
     
         data /= 255
 
-    
     if useWholeTimeSet:
         # Uncomment if LSTMif is_mixed:
         # Or better to put the transpose inside
@@ -103,7 +96,6 @@ def run_net(net, data, num_classes):
             cops[:,i,:] += output
         results = torch.as_tensor(cops)
         cops, _ = torch.max(results, 1)
-        
         
     return cops
 
@@ -137,9 +129,10 @@ def train_model(epoch, model, num_classes, train_dataloader, scheduler, optimize
 
     scheduler.step()
     model.train()
-
-    for inputs, labels in tqdm(train_dataloader):
-
+    i = 1
+    for inputs, labels in (sbar := tqdm(train_dataloader)):
+        sbar.set_description("Curr Acc %s " % str(running_corrects/i))
+        i += 1
         if is_mixed:
             inputs = [
                 Variable(inputs[0], requires_grad=True).to(device),
@@ -413,7 +406,15 @@ train_models = [
     (("ResNet_SNN", ResNet_SNN, "ucf101", 2e-4, 20, 2, True, 2), {}),
     (("Small_CNN", C3DNN_Small, "kth_rbg_diff", 2e-4, 20, 5,  True, 2), {}),
     (("C3SNN_Normal", C3SNN_ModelT, "kth_rbg_diff", 2e-4, 20, 5, True, 2), {}),
-    #(("ResNet_2CNN", MixModelDefault, "hmdb51", 2e-4, 20, 2,  True, 5), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("C3SNN_Scaled", C3SNN_ModelT_scaled, "kth_rbg_diff", 2e-4, 20, 5, True, 2), {}),
+    (("C3SNN_Paramed", C3SNN_ModelT_paramed, "kth_rbg_diff", 2e-4, 20, 5, True, 2), {}),
+    (("ResNet_2CNN", MixModelDefault, "hmdb51", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_SNN_Inverse", ResNet_SNN_InverseScale, "hmdb51", 2e-4, 20, 3, True, 2), {}), # Not fully trained. Not worth it
+    (("ResNet_2CNN", MixModelDefault, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("C3DSNN_Whole", C3DSNN_Whole, "kith_small", 2e-4, 20, 5, True, 2), {'is_mixed' : False, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("C3DSNN_Whole", C3DSNN_Whole, "kith_rgb_small", 2e-4, 20, 5, True, 2), {'is_mixed' : False, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_2CNN_SNN", MixModelDefaultSNN, "hmdb51", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_2CNN_SNN", MixModelDefaultSNN, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
 ]
 
 

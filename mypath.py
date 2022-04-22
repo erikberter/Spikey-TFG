@@ -44,6 +44,27 @@ class Path(object):
             output_dir = 'datasets\\KTH_RGB_Diff'
 
             return root_dir, output_dir
+        elif database == 'hmdb51_rbg_diff':
+            # folder that contains class labels
+            root_dir = 'datasets\\HMBD51\\Processed'
+
+            output_dir = 'datasets\\HMDB51_RGB_Diff'
+
+            return root_dir, output_dir
+        elif database == 'kith_small':
+            # folder that contains class labels
+            root_dir = 'datasets\\KTH\\Processed'
+
+            output_dir = 'datasets\\KTH_Small'
+
+            return root_dir, output_dir
+        elif database == 'kith_rgb_small':
+            # folder that contains class labels
+            root_dir = 'datasets\\KTH\\Processed'
+
+            output_dir = 'datasets\\KTH_Small_RGB_Diff'
+
+            return root_dir, output_dir
         else:
             print('Database {} not available.'.format(database))
             raise NotImplementedError
