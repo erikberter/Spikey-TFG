@@ -50,14 +50,15 @@ nTestInterval = 2 # Run on test set every nTestInterval epochs
 snapshot = 5 # Store a model every snapshot epochs
 lr = 3e-4 # Learning rate
 
-dataset = 'kth_rbg_diff' # Options: hmdb51 or ucf101
+dataset = 'hmdb51_3' # Options: hmdb51 or ucf101
 
 
 #########################
 #      N. Classes       #
 #########################
 
-dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101, 'kth_rbg_diff' : 6}
+dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101,
+             'kth_rbg_diff' : 6, 'hmdb51_2':51, 'hmdb51_3':51}
 
 if dataset in dataset_classes:
     num_classes = dataset_classes[dataset]
@@ -77,7 +78,7 @@ else:
     run_id = int(runs[-1].split('_')[-1]) + 1 if runs else 0
 
 save_dir = os.path.join(save_dir_root, 'run', 'run_' + str(run_id))
-modelName = 'Kaka' # Options: C3D or R2Plus1D or R3D
+modelName = 'HMDB51' # Options: C3D or R2Plus1D or R3D
 saveName = modelName + '-' + dataset
 
 def run_net(net, data, num_classes):
@@ -102,22 +103,12 @@ def run_net(net, data, num_classes):
     else:
         for i in range(0, data.shape[1]):
             torch.cuda.empty_cache()
-            #print(f"El minimo en los datos es {torch.min(data[:,i,:])}")
-            output = net(data[:,i,:])
-            #print(f"Output JEJE:\n {output}")
-            cops[:,i,:] += output
+            
+            cops[:,i,:] += net(data[:,i,:])
+            
         results = torch.as_tensor(cops)
         cops, _ = torch.max(results, 1)
-        #cops = torch.mean(results, 1)
-    #print(net.print_params())
-    #print(f"Outputs:\n {cops[0]}\n")
-    #print("###################")
-    #input("SANTA")
-    #_, preds = torch.max(cops, 1)
-    #print(f"\nDevolviendo: \n{cops}")
-    #q=""
-    #while len(q) == 0:
-    #    q = input("MMMM")
+        
     return cops
 
 def to_categorical(y, num_classes):
@@ -164,10 +155,12 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=32, preprocess = False), batch_size=8, shuffle=True, num_workers=4)
+    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16, preprocess = True), batch_size=8, shuffle=True, num_workers=4)
     if useVal:
-        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=32), batch_size=8, num_workers=4)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=32), batch_size=8, num_workers=4)
+        val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=16), batch_size=8, num_workers=4)
+    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=16), batch_size=8, num_workers=4)
+
+    return 
 
     if useVal:
         trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
@@ -178,8 +171,6 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     
     test_size = len(test_dataloader.dataset)
 
-    #input_train, label_train = next(iter(trainval_loaders['train']))
-    #input_val, label_val = next(iter(trainval_loaders['val']))
     for epoch in range(resume_epoch, num_epochs):
         # each epoch has a training and validation step
         for phase in phases:
@@ -203,8 +194,6 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 inputs = Variable(inputs, requires_grad=True).to(device)
                 labels = Variable(labels).to(device)
                 
-                #inputs = Variable(input_train, requires_grad=True).to(device)
-                #labels = Variable(label_train).to(device)
                 
 
                 

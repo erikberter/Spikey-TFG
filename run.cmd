@@ -1,2 +1,0 @@
-activate NeuralCompu
-python trainSNN.py

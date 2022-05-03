@@ -16,6 +16,20 @@ class Path(object):
             output_dir = 'datasets\\HMBD51\\Processed'
 
             return root_dir, output_dir
+        elif database == 'hmdb51_2':
+            # folder that contains class labels
+            root_dir = 'datasets\\HMBD51\\HMBD51'
+
+            output_dir = 'datasets\\HMBD51_2\\Processed'
+
+            return root_dir, output_dir
+        elif database == 'hmdb51_3':
+            # folder that contains class labels
+            root_dir = 'datasets\\HMBD51\\HMBD51'
+
+            output_dir = 'datasets\\HMBD51_3\\Processed'
+
+            return root_dir, output_dir
         elif database == 'kth':
             # folder that contains class labels
             root_dir = 'datasets\\KTH\\KTH'
@@ -84,7 +98,7 @@ class Path(object):
             test_file = 'datasets\\KTH\\test_labels.txt'
 
             return train_file, val_file, test_file
-        elif database =='hmdb51':
+        elif 'hmdb51' in database:
             return 'datasets\\HMBD51\\splits', None, None
         else:
             print('Database splits {} not available.'.format(database))

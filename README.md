@@ -1,33 +1,12 @@
 # Spikey TFG
 
-Repositorio de mi TFG acerca de clasificación de video.
+Repositorio de mi TFG: "Investigación y desarrollo de un clasificador de video basado en redes de impulsos"
 
-**Hacer referencia al repositorio de donde se ha extraido el dataloader**
+Este repositorio se ha implementado mediante PyTorch y Norse.
 
+## Enlaces del trabajo en colab
 
-
-
-## Lista de Datasets
-
-* KTH 		
-* WEIZMANN	
-* IXMAS 		
-* UCF11 		
-* UCF50 		
-* UCF101 	
-* HMDB51 		
-* UCFSPORTS 	
+* Explicabilidad: https://colab.research.google.com/drive/1zcMXI1giO-7sHt-6zl75R5JVj7z3EtDN#scrollTo=hGBGZIKCPJAn
 
 
-## Lista de Modelos
-
-En esta sección se listan los modelos implementados en el repositorio.
-
-Los modelos se encuentran en la carpeta de network. 
-
-* C3SNN: Modelo CNN-3D + SNN(?Linear[LIF] + LiLinearCell)
-* CSNN: Modelo CNN-2D + SNN(?Linear[LIF] + LiLinearCell)
-* C3NN_Base: Modelo CNN-3D + Linear
-* CNN_LSTM_Base: Modelo CNN-2D + LSTM
-
-
+Pasar el TFG mediante: https://gitfront.io/

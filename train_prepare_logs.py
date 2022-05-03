@@ -10,10 +10,12 @@ from yaml import parse
 
 
 from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small, RPlus_CNN
-from network.MixModels.mixer_models import MixModelDefault
-from network.MixModels.mixer_models_SNN import MixModelDefaultSNN
 from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled, C3SNN_ModelT_paramed, C3DSNN_Whole
-from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale
+from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale, ResNet_Cop_SNN, SNN_Cont
+
+from network.MixModels.mixer_models import MixModelDefault
+from network.MixModels.mixer_models_SNN import MixModelDefaultSNN, MixModelAltSNN, MixModelDefaultSNNBig
+
 
 from tqdm import tqdm
 
@@ -52,7 +54,7 @@ useWholeTimeSet = True
 #      N. Classes       #
 #########################
 
-dataset_classes = {'hmdb51' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101, 'kth_rbg_diff' : 6, 
+dataset_classes = {'hmdb51' : 51,'hmdb51_2' : 51,'hmdb51_3' : 51, 'hmdb51_flow' : 51,  'kth' : 6, 'ucf101': 101, 'kth_rbg_diff' : 6, 
         'hmdb51_rbg_diff' : 51, 'kith_small':2, 'kith_rgb_small':2}
 
 
@@ -131,7 +133,7 @@ def train_model(epoch, model, num_classes, train_dataloader, scheduler, optimize
     model.train()
     i = 1
     for inputs, labels in (sbar := tqdm(train_dataloader)):
-        sbar.set_description("Curr Acc %s " % str(running_corrects/i))
+        sbar.set_description("Curr Acc %s " % str(100*running_corrects/(i*6)))
         i += 1
         if is_mixed:
             inputs = [
@@ -363,6 +365,11 @@ def train_session_model(
     for epoch in range(resume_epoch, num_epochs):
         print("Epoch: {}/{} ".format(epoch+1, num_epochs))
         
+        if epoch == 6:
+            if hasattr(model, 'activate_grad') and callable(getattr(model, 'activate_grad')):
+                print('Activating gradients')
+                model.activate_grad(True)
+
         # Training
         train_model(epoch, model, num_classes, train_dataloader, scheduler, optimizer, criterion, writer, is_mixed=is_mixed)
         
@@ -415,7 +422,23 @@ train_models = [
     (("C3DSNN_Whole", C3DSNN_Whole, "kith_rgb_small", 2e-4, 20, 5, True, 2), {'is_mixed' : False, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
     (("ResNet_2CNN_SNN", MixModelDefaultSNN, "hmdb51", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
     (("ResNet_2CNN_SNN", MixModelDefaultSNN, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
-]
+    # Fracaso, el pretraining en las resnet 3d solo empeora todo
+    (("ResNet_2CNN_SNN_Alt_Bad", MixModelAltSNN, "hmdb51", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_2CNN_SNN_Alt", MixModelDefaultSNNBig, "hmdb51", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_2CNN_SNN_Alt", MixModelDefaultSNNBig, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_SNN", ResNet_SNN, "hmdb51_2", 2e-4, 20, 4, True, 2), {}),
+    (("ResNet_CNN", ResNet_CNN, "hmdb51_2", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN", ResNet_SNN, "hmdb51_3", 2e-4, 20, 4, True, 2), {}),
+    (("ResNet_CNN", ResNet_CNN, "hmdb51_3", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_Cop", ResNet_Cop_SNN, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_Cop", ResNet_Cop_SNN, "hmdb51_2", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_Cop", ResNet_Cop_SNN, "hmdb51_3", 2e-4, 20, 4,  True, 2), {}),
+    (("SNN_Cont", SNN_Cont, "kth_rbg_diff", 2e-4, 20, 4,  True, 2), {}),
+
+    
+
+    
+   ]
 
 
 def prepare_config():

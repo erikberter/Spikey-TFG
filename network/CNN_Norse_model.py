@@ -8,6 +8,8 @@ from norse.torch.module.encode import ConstantCurrentLIFEncoder
 from norse.torch.module.lif import LIFRecurrentCell, LIFCell
 from norse.torch.module.leaky_integrator import LILinearCell
 
+from norse.torch.module.lsnn import LSNNCell
+
 import torchvision.models as models
 
 class CNN_Norse_model(nn.Module):
@@ -248,6 +250,178 @@ class ResNet_SNN_InverseScale(nn.Module):
             out_c, sc = self.classification(z, sc)
             voltages[ts, :, :] = out_c
         
+        y_hat = voltages[-1]
+        
+        return y_hat
+
+
+
+
+class ResNet_Cop_SNN(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_Cop_SNN, self).__init__()
+        self.state_dim = 4
+        self.input_features = 16
+        self.hidden_features = 128
+        self.output_features = 2
+        self.seq_length = 24
+        self.n_classes = n_classes
+        self.uses_ts = False
+        self.constant_current_encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.33))
+
+        self.features = models.video.r3d_18(pretrained=True)
+        for param in self.features.parameters():
+            param.requires_grad = False
+
+        self.classification = SequentialState(
+            
+            nn.Linear(400, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.25),
+            LILinearCell(128, n_classes, p),
+        )
+
+        self.relu = nn.ReLU()
+        
+        self.saved_log_probs = []
+        self.rewards = []
+
+        self.feature_scalar = torch.nn.Parameter(torch.ones(1)) 
+        self.encoder_scalar = torch.nn.Parameter(torch.ones(1))
+
+    def print_params(self):
+        print(f"Feature Scalar {self.feature_scalar}")
+        print(f"Encoder Scalar {self.encoder_scalar}")
+
+    def forward(self, x):
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        out = 2 * self.feature_scalar * self.features(x)
+        out_f = torch.flatten(out, start_dim=1)
+        #out_f = self.relu(out_f)
+        #print(f"La media en feature es de {torch.mean(out_f)}")
+        #input("Pausa")
+        encoded = 5 * self.encoder_scalar * self.constant_current_encoder(out_f)
+
+        sc = None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :] 
+            #print(f"La media en {ts} es de {torch.mean(z)}")
+            #input("Pausa")
+            out_c, sc = self.classification(z, sc)
+            voltages[ts, :, :] = out_c
+        
+        y_hat = voltages[-1]
+        
+        return y_hat
+
+
+class SNN_Cont(nn.Module):
+    def __init__(self, n_classes):
+        super(SNN_Cont, self).__init__()
+        self.n_classes = n_classes
+        self.seq_length = 16
+        self.constant_current_encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.33))
+
+        self.features = nn.Sequential(
+            nn.Conv3d(3, 32, kernel_size= 3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(32),
+            nn.Conv3d(32, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(32),
+            
+            nn.MaxPool3d(2),
+            
+            nn.Conv3d(32, 64, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+            nn.Conv3d(64, 64, kernel_size=(1,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+
+            nn.MaxPool3d(2),
+
+            nn.Conv3d(64, 64, kernel_size=(1,3,3), stride=(1,2,2), padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+            nn.Conv3d(64, 64, kernel_size=(1,3,3), stride=1, padding=1),
+            nn.ReLU(),
+
+            nn.MaxPool3d((1,2,2)),
+        )
+
+        self.classification = SequentialState(
+            
+            nn.Linear(576, 128, bias=False),
+            LSNNCell(),
+            nn.Dropout(0.2),
+            nn.Linear(128, 128, bias=False),
+            LSNNCell(),
+            nn.Dropout(0.2),
+            nn.Linear(128, 128, bias=False),
+            LSNNCell(),
+            nn.Dropout(0.2),
+            LILinearCell(128, n_classes, p),
+        )
+
+        self.relu = nn.ReLU()
+        
+        self.feature_scalar = torch.nn.Parameter(torch.ones(1)) 
+        self.encoder_scalar = torch.nn.Parameter(torch.ones(1))
+
+    def print_params(self):
+        print(f"Feature Scalar {self.feature_scalar}")
+        print(f"Encoder Scalar {self.encoder_scalar}")
+
+    def forward(self, x):
+        # [batch, ts, cha, img, img]
+
+
+        batch_size = x.shape[0]
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+        #print(x.shape)
+
+        out = 11 * self.feature_scalar * self.features(x)
+        #print(f"La out shape es {out.shape}")
+        #out_f = torch.flatten(out, start_dim=1)
+        #out_f = self.relu(out_f)
+        #print(f"La media en feature es de {torch.mean(out)}")
+        #input("Pausa")
+        encoded = 8 * self.encoder_scalar * self.constant_current_encoder(out)
+        # [batch, sql, ts, img, img]
+
+        #print(f"La encde  shape es {encoded.shape}")
+        #input("Pause")
+        encoded = encoded.reshape(encoded.shape[0]*encoded.shape[3], encoded.shape[1], encoded.shape[2],encoded.shape[4],encoded.shape[5])
+        #print(f"La encde  shape2 es {encoded.shape}")
+        #input("Pause")
+        sc = None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :] 
+            z = torch.flatten(z, start_dim=1)
+            #print(f"La media en feature es de {torch.mean(z)}")
+            #input(f"Pausa {ts}")
+            out_c, sc = self.classification(z, sc)
+            voltages[ts, :, :] = out_c
+        
+        #print(voltages[-1])
+        #input("STOP")
         y_hat = voltages[-1]
         
         return y_hat

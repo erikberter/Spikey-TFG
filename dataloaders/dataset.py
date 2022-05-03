@@ -7,6 +7,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from mypath import Path
 
+from tqdm import tqdm
 
 
 def get_ufc101(dataset, file, video_files):
@@ -33,7 +34,7 @@ def get_kth(dataset,file, video_files):
 
 def get_hmdb51(dataset, file, video_files):
 
-    split_n = 1
+    split_n = 3
 
     
     split_file_base, _, _ = Path.train_test_val_split_files(dataset)
@@ -43,7 +44,6 @@ def get_hmdb51(dataset, file, video_files):
     val_files = [train_name.split()[0] for train_name in open(file_r) if train_name.split()[1] == '0' ]
     test_files = [train_name.split()[0] for train_name in open(file_r) if train_name.split()[1] == '2' ]
 
-    
     return train_files, val_files, test_files
 
 
@@ -92,7 +92,7 @@ class VideoDataset(Dataset):
         if (not self.check_preprocess()) or preprocess:
             input("Dataset will be preprocess. Are you okey with it?")
             print('Preprocessing of {} dataset, this will take long, but it will be done only once.'.format(dataset))
-            if dataset == 'ucf101' or dataset == 'kth' or dataset =='hmdb51':
+            if dataset == 'ucf101' or dataset == 'kth' or 'hmdb51' in dataset:
                 self.preprocess(custom_ttv = True)
             else:
                 self.preprocess()
@@ -176,7 +176,7 @@ class VideoDataset(Dataset):
             os.mkdir(os.path.join(self.output_dir, 'test'))
 
         # Split train/val/test sets
-        for file in os.listdir(self.root_dir):
+        for file in tqdm(os.listdir(self.root_dir)):
             file_path = os.path.join(self.root_dir, file)
             video_files = [name for name in os.listdir(file_path)]
 
