@@ -128,9 +128,9 @@ class VideoDataset(Dataset):
         buffer = self.crop(buffer, self.clip_len, self.crop_size)
         labels = np.array(self.label_array[index])
 
-        #if self.split == 'test':
-            # Perform data augmentation
-        #    buffer = self.randomflip(buffer)
+        # Perform data augmentation
+        if self.split != 'test':
+            buffer = self.randomflip(buffer)
         buffer = self.normalize(buffer)
         buffer = self.to_tensor(buffer)
         return torch.from_numpy(buffer), torch.from_numpy(labels)
@@ -274,7 +274,7 @@ class VideoDataset(Dataset):
 
         if np.random.random() < 0.5:
             for i, frame in enumerate(buffer):
-                frame = cv2.flip(buffer[i], flipCode=1)
+                #frame = cv2.flip(buffer[i], flipCode=1)
                 buffer[i] = cv2.flip(frame, flipCode=1)
 
         return buffer

@@ -442,3 +442,131 @@ class C3DNN_Small_T(nn.Module):
 
     def forward(self, x):
         return self.features(x)
+
+
+
+class ResNet_CNN_exp(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_CNN_exp, self).__init__()
+        
+        self.n_classes = n_classes
+        self.uses_ts = False
+
+        self.features = models.video.r3d_18(pretrained=True)
+
+        self.classification = nn.Sequential(
+            
+            nn.Linear(400, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=True),
+            nn.ReLU(),
+            nn.Dropout(0.25),
+            nn.Linear(128, n_classes, bias=True),
+        )
+
+        
+
+    def forward(self, x):
+        
+
+        out = self.features(x)
+        
+        out = self.classification(out)
+        return out
+
+
+class ResNet_CNN_expV(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_CNN_expV, self).__init__()
+        
+        self.n_classes = n_classes
+        self.uses_ts = False
+
+        self.features = models.video.r3d_18(pretrained=True)
+
+        self.lin =  nn.Linear(400, 128, bias=True)
+        self.relu =     nn.ReLU()
+        self.drop =    nn.Dropout(0.25)
+        self.lin1 =    nn.Linear(128, 128, bias=True)
+        self.relu1 =    nn.ReLU()
+        self.drop1 =    nn.Dropout(0.25)
+        self.lin2=    nn.Linear(128, 128, bias=True)
+        self.relu2 =     nn.ReLU()
+        self.drop2 =    nn.Dropout(0.25)
+        self.li =     nn.Linear(128, n_classes, bias=True)
+        
+
+        
+
+    def forward(self, x):
+        out = self.features(x)
+
+        out = self.lin(out)
+        out = self.relu(out)
+        out = self.drop(out)
+
+        out_1 = self.lin1(out)
+        out_1 = self.relu1(out_1)
+        out_1 = self.drop1(out_1)
+
+        out_1 = out_1 + out
+
+        out_2 = self.lin2(out_1)
+        out_2 = self.relu2(out_2)
+        out_2 = self.drop2(out_2)
+
+        out_2 = out_2 + out_1
+
+        out_f = self.li(out_2)
+
+        return out_f
+
+
+class ResNet_CNN_Test(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_CNN_Test, self).__init__()
+        
+        self.n_classes = n_classes
+        self.uses_ts = False
+
+        self.features = models.video.r3d_18(pretrained=True)
+
+        self.lin =  nn.Linear(400, 128, bias=True)
+        self.relu =     nn.ReLU()
+        self.drop =    nn.Dropout(0.25)
+        self.lin1 =    nn.Linear(128, 128, bias=True)
+        self.relu1 =    nn.ReLU()
+        self.drop1 =    nn.Dropout(0.25)
+        self.lin2=    nn.Linear(128, 128, bias=True)
+        self.relu2 =     nn.ReLU()
+        self.drop2 =    nn.Dropout(0.25)
+        self.li =     nn.Linear(128, n_classes, bias=True)
+        
+        
+
+    def forward(self, x):
+        out = self.features(x)
+
+        out = self.lin(out)
+        out = self.relu(out)
+        out = self.drop(out)
+
+        out_1 = self.lin1(out)
+        out_1 = self.relu1(out_1)
+        out_1 = self.drop1(out_1)
+
+        out_1 = out_1 + out
+
+        out_2 = self.lin2(out_1)
+        out_2 = self.relu2(out_2)
+        out_2 = self.drop2(out_2)
+
+        out_2 = out_2 + out_1
+
+        out_f = self.li(out_2)
+
+        return out_f

@@ -23,6 +23,10 @@ def decode(x):
     #y_hat, _ = torch.max(x, 0)
     return y_hat
 
+def decode_1(x):
+    #y_hat = x[-1]
+    y_hat, _ = torch.max(x, 0)
+    return y_hat
 
 
 class SNN_Model_a(nn.Module):
@@ -102,6 +106,45 @@ class SNN_Model_b(nn.Module):
 
         return voltages
 
+
+class SNN_Model_c(nn.Module):
+
+    def __init__(self, n_classes, seq_length, p, uses_ts = False, debug = False):
+        super(SNN_Model_c, self).__init__()
+        self.seq_length = seq_length
+        self.n_classes = n_classes
+
+        self.uses_ts = True
+        self.debug = debug
+
+        self.classification = SequentialState(
+            nn.Linear(1152, 512),
+            LIFCell(p),
+            nn.Dropout(0.2),
+            nn.Linear(512, 256),
+            LIFCell(p),
+            nn.Dropout(0.2),
+            LILinearCell(256, n_classes, p),
+        )
+
+    def forward(self, x):
+        #return self.classification(x)
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        sc = None
+        for ts in range(self.seq_length):
+            z = x[ts, :] if self.uses_ts else x
+
+            out_c, sc = self.classification(z, sc)
+
+            voltages[ts, :, :] = out_c
+
+        return voltages
+
         
 class C3DSNN_Whole(nn.Module):
     def __init__(self, n_classes):
@@ -135,7 +178,7 @@ class C3DSNN_Whole(nn.Module):
 
     def forward(self, x):
         
-        x = 3 * self.encoder( 22 * x)
+        x = 5 * self.encoder( 22 * x)
 
         batch_size = x.shape[1]
         
@@ -173,6 +216,128 @@ class C3DSNN_Whole(nn.Module):
 
         x = self.decoder(voltages)
         return x 
+
+
+
+class C3DSNN_Whole_Exp(nn.Module):
+    def __init__(self, n_classes):
+        super(C3DSNN_Whole_Exp, self).__init__()
+        
+        self.seq_length = 32
+        p = LIFParameters(v_th=torch.as_tensor(0.23))
+        self.debug = False
+        self.encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        self.n_classes = n_classes
+        
+        self.conv1 = nn.Conv3d(3, 6, (5,5,5), (2,3,3), bias=False)
+        self.lif1 = LIFCell(p)
+        self.conv2 = nn.Conv3d(6, 12, (3,5,5), (2,2,2), bias=False)
+        self.lif2 = LIFCell(p)
+        self.conv3 = nn.Conv3d(12, 12, (1,3,3), (1,2,2), bias=False)
+        self.lif3 = LIFCell(p)
+        self.flatten = nn.Flatten()
+        self.linear = nn.Linear(3528, 256, bias=False)
+        self.lif4 = LIFCell(p)
+        self.drop1 = nn.Dropout(0.2)
+        self.linear2 = nn.Linear(256, 256, bias=False)
+        self.lif5 = LIFCell(p)
+        self.drop2 = nn.Dropout(0.2)
+        self.li = LILinearCell(256, n_classes, p)
+        
+        self.decoder = decode_1
+
+        self.gradients = None
+
+    def activations_hook(self, grad):
+        self.gradients = grad
+
+    def forward(self, x):
+        
+        x = 7 * self.encoder( 22 * x)
+
+        batch_size = x.shape[1]
+        
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        sf1,sf2,sf3,sf4,sf5, sfout = None,None,None,None,None, None
+        for ts in range(self.seq_length):
+            z = x[ts, :]
+
+            z = self.conv1(z)
+            z, sf1 = self.lif1(z, sf1)
+            z = self.drop1(z)
+            z = self.conv2(5 * z)
+            z, sf2 = self.lif2(z, sf2)
+            z = self.drop1(z)
+            z = self.conv3(5 * z)
+            z, sf3 = self.lif3(z, sf3)
+            z = self.drop1(z)
+            if z.requires_grad:
+              h = z.register_hook(self.activations_hook)
+
+            z = self.flatten( 5 * z)
+            z = self.linear(z)
+            z, sf4 = self.lif4(z, sf4)
+            z = self.drop1(z)
+            z = self.linear2(5 * z)
+            #z, sf5 = self.lif5(z, sf5)
+            #z = self.drop2(z)
+            z, sfout = self.li(5 * z, sfout)
+
+            voltages[ts, :, :] = z
+
+        x = self.decoder(voltages)
+        return x 
+
+
+class C3DNN_Whole_Exp(nn.Module):
+    def __init__(self, n_classes):
+        super(C3DNN_Whole_Exp, self).__init__()
+        
+        self.seq_length = 32
+        self.debug = False
+        self.encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        self.n_classes = n_classes
+        
+        self.conv1 = nn.Conv3d(3, 6, (3,5,5), (2,3,3), bias=False)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv3d(6, 12, (3,5,5), (2,2,2), bias=False)
+
+        self.conv3 = nn.Conv3d(12, 12, (1,3,3), (1,2,2), bias=False)
+
+        self.flatten = nn.Flatten()
+        self.linear = nn.Linear(2940, 256, bias=False)
+
+        self.drop1 = nn.Dropout(0.2)
+        self.drop2 = nn.Dropout(0.2)
+        self.linear2 = nn.Linear(256, 256, bias=False)
+        self.linear3 = nn.Linear(256, n_classes, bias=False)
+
+        
+    def forward(self, x):
+        
+        z = self.conv1(3 * x)
+        z = self.relu(z)
+        z = self.drop1(z)
+        z = self.conv2(z)
+        z = self.relu(z)
+        z = self.drop1(z)
+        z = self.conv3(z)
+        z = self.relu(z)
+        z = self.drop1(z)
+        z = self.flatten(z)
+        z = self.linear(z)
+        z = self.relu(z)
+        z = self.drop1(z)
+        z = self.linear2(z)
+        z = self.drop2(z)
+        z = self.relu(z)
+        z = self.linear3(z)
+
+        return z
+
 
 class C3DSNN_Base(nn.Module):
     def __init__(self, snn, cnn, use_encoder = True, cnn_scaler = 7, encoder_scaler = 1):
@@ -518,6 +683,76 @@ class C3DSNN_C3D_ModelT(nn.Module):
             input("Pause")
         return x 
 
+
+
+class C3DSNN_ModelT_Final(nn.Module):
+    def __init__(self, n_classes, use_encoder = False):
+        super(C3DSNN_ModelT_Final, self).__init__()
+        
+        seq_length = 32
+        p = LIFParameters(v_th=torch.as_tensor(0.4))
+        self.debug = False
+        self.use_encoder = True
+        self.encoder = ConstantCurrentLIFEncoder(seq_length)
+
+        ## Network Parameters
+
+        # Scales the CNN output by a factor to improve the ConstantCurrentLIFEncoder Input
+        self.cnn_scaler = 5
+        self.encoder_scaler = 3
+
+        self.cnn = nn.Sequential(
+            nn.Conv3d(3, 32, kernel_size= 3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+            
+            nn.MaxPool3d(2),
+            
+            nn.Conv3d(64, 64, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(64, 64, kernel_size=(3,3,3), stride=1, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm3d(64),
+
+            nn.MaxPool3d(2),
+
+            nn.Conv3d(64, 128, kernel_size=(3,3,3), stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(128, 128, kernel_size=(1,3,3), stride=1, padding=1),
+            nn.Sigmoid(),
+            
+            nn.MaxPool3d(2),
+
+            nn.Flatten(),
+            
+        )
+        self.snn = SNN_Model_c(n_classes, seq_length, p, uses_ts=use_encoder, debug= self.debug)
+
+        self.decoder = decode
+
+    def forward(self, x):
+        
+        x = self.cnn_scaler * self.cnn(x)
+        if self.debug:
+            #print(f"CNN {x[0][:20]}")
+            print(f"CNN {x.shape}")
+        if self.use_encoder:
+            x = self.encoder_scaler * self.encoder(x)
+        if self.debug:
+            #print(f"Encoder {x[7][0][:20]}")
+            print(f"Encoder {x.shape}")
+        x = self.snn(x)
+        if self.debug:
+            print(f"SNN {x[:,0,:]}")
+            print(f"SNN {x.shape}")
+        x = self.decoder(x)
+        if self.debug:
+            print(f"Decoder {x}")
+            print(f"Decoder {x.shape}")
+            input("Pause")
+        return x 
 
 
 

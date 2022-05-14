@@ -187,6 +187,165 @@ class ResNet_SNN(nn.Module):
         return y_hat
 
 
+class ResNet_SNN_exp(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_SNN_exp, self).__init__()
+
+        self.seq_length = 32
+        self.n_classes = n_classes
+        self.uses_ts = False
+        self.constant_current_encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.33))
+
+        self.features = models.video.r3d_18(pretrained=True)
+        #for param in self.features.parameters():
+        #    param.requires_grad = False
+        self.classification = SequentialState(
+            
+            nn.Linear(400, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.25),
+            nn.Linear(128, 128, bias=False),
+            LIFCell(p),
+            nn.Dropout(0.25),
+            LILinearCell(128, n_classes, p),
+        )
+
+        self.batchnorm = nn.BatchNorm1d(400)
+        
+
+        self.feature_scalar = torch.nn.Parameter(torch.ones(1)) 
+        self.encoder_scalar = torch.nn.Parameter(torch.ones(1))
+
+    def print_params(self):
+        print(f"Feature Scalar {self.feature_scalar}")
+        print(f"Encoder Scalar {self.encoder_scalar}")
+
+    def forward(self, x):
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        out = self.features(x)
+        #out = self.batchnorm(out)
+        #print(f"El out_0 es de {out[0]}")
+        #input("Pausa")
+        out_f = torch.flatten(out, start_dim=1)
+        #out_f =  * self.relu(out_f)
+        
+        
+        print(f"El out_f es de {out_f[0]}")
+        encoded = 5 *  self.constant_current_encoder( 2 * out_f)
+
+        sc, sl0,sl1,sl2 = None, None,None,None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :] 
+            #print(f"La media en {ts} es de {torch.mean(z)}")
+            #input("Pausa")
+            out_c, sc = self.classification(z, sc)
+            voltages[ts, :, :] = out_c
+        
+        y_hat = voltages[-1]
+        print(f"El y_hat es de {y_hat[0]}")
+        
+        return y_hat
+
+
+class ResNet_SNN_expV(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_SNN_expV, self).__init__()
+
+        self.seq_length = 24
+        self.n_classes = n_classes
+        self.uses_ts = False
+        self.constant_current_encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.23))
+
+        self.features = models.video.r3d_18(pretrained=True)
+        #for param in self.features.parameters():
+        #    param.requires_grad = False
+        
+            
+        self.lin =     nn.Linear(400, 128, bias=True)
+        self.lif =    LIFCell(p)
+        self.drop =    nn.Dropout(0.25)
+        self.lin1 =    nn.Linear(128, 128, bias=True)
+        self.lif1 =    LIFCell(p)
+        self.drop1 =    nn.Dropout(0.25)
+        self.lin2 =    nn.Linear(128, 128, bias=True)
+        self.lif2 =    LIFCell(p)
+        self.drop2 =    nn.Dropout(0.25)
+        self.li =    LILinearCell(128, n_classes, p)
+        
+
+        self.batchnorm = nn.BatchNorm1d(400)
+        
+
+        self.feature_scalar = torch.nn.Parameter(torch.ones(1)) 
+        self.encoder_scalar = torch.nn.Parameter(torch.ones(1))
+
+    def print_params(self):
+        print(f"Feature Scalar {self.feature_scalar}")
+        print(f"Encoder Scalar {self.encoder_scalar}")
+
+    def forward(self, x):
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        out = self.features(x)
+        #out = self.batchnorm(out)
+        #print(f"El out_0 es de {out[0]}")
+        #input("Pausa")
+        out_f = torch.flatten(out, start_dim=1)
+        #out_f =  * self.relu(out_f)
+        
+        
+        #print(f"El out_f es de {out_f[0]}")
+        encoded = self.constant_current_encoder(out_f)
+
+        sc, sl0,sl1,sl2 = None, None,None,None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :] 
+            #print(f"La media en {ts} es de {torch.mean(z)}")
+            #input("Pausa")
+            #out_c, sc = self.classification(z, sc)
+
+            out = self.lin(z)
+            out, sl0 = self.lif(out, sl0) 
+            out = self.drop(out)
+
+            out_1 = self.lin1( out)
+            out_1, sl1 = self.lif1(out_1, sl1)
+            out_1 = self.drop1(out_1)
+
+            out_1 = out_1 + out
+
+            out_2 = self.lin2( out_1)
+            out_2, sl2 = self.lif2(out_2, sl2)
+            out_2 = self.drop2(out_2)
+            
+            out_2 = out_2 + out_1
+
+            out_f, sc = self.li(out_2, sc)
+
+
+            voltages[ts, :, :] = out_f
+        
+        y_hat = voltages[-1]
+        #print(f"El y_hat es de {y_hat[0]}")
+        
+        return y_hat
+
+
+
 class ResNet_SNN_InverseScale(nn.Module):
     def __init__(self, n_classes):
         super(ResNet_SNN_InverseScale, self).__init__()

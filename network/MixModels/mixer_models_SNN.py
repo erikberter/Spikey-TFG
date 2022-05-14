@@ -136,6 +136,72 @@ class MixClassificationBigSNN_Alt(nn.Module):
         z = self.decode(voltages)
         return z
 
+
+
+class MixClassificationBigSNN_expV(nn.Module):
+
+    def __init__(self, input_size, n_classes):
+        super(MixClassificationBigSNN_expV, self).__init__()
+        self.seq_length = 24
+        self.n_classes = n_classes
+
+        p =  LIFParameters(v_th=torch.as_tensor(0.185))
+
+        self.encoder = ConstantCurrentLIFEncoder(self.seq_length)
+        self.decode = decode
+
+
+        self.lin1 = nn.Linear(2 * input_size, 256, bias=False)
+        self.lif1 = LIFCell(p)
+        self.drop1 = nn.Dropout(0.25)
+        self.lin2 = nn.Linear(256, 256, bias=False)
+        self.lif2 = LIFCell(p)
+        self.drop2 = nn.Dropout(0.25)
+        self.lin3 = nn.Linear(256, 256, bias=False)
+        self.lif3 = LIFCell(p)
+        self.drop3 = nn.Dropout(0.25)
+        self.li = LILinearCell(256, n_classes, p)
+        
+        
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        encoded = self.encoder(x)
+
+        slif1, slif2,slif3,sout = None, None, None, None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :]
+
+            out = self.lin1(z)
+            out, slif1 = self.lif1(out, slif1)
+            out = self.drop1(out)
+
+
+            out_1 = self.lin2(out) 
+            out_1, slif2 = self.lif2(out_1, slif2)
+            out_1 = self.drop2(out_1)
+
+            out_1 = out_1 + out
+
+            out_2 = self.lin3(out_1)
+            out_2, slif3 = self.lif3(out_2, slif3)
+            out_2 = self.drop3(out_2)
+            
+            out_2 = out_2 + out_1
+
+            out_c, sout = self.li(out_2, sout)
+
+            voltages[ts, :, :] = out_c
+
+        z = self.decode(voltages)
+        return z
+
+
 class MixClassificationBig(nn.Module):
     """
         Conv3D NN Model to extract features from image
@@ -241,16 +307,45 @@ class MixModelDefaultSNNBig(nn.Module):
         self.temporal =  models.video.r3d_18(pretrained=True)
         self.fusion = MixClassificationBigSNN_Alt(400,num_classes)
 
-        for param in self.spatial.parameters():
-            param.requires_grad = False
+        #for param in self.spatial.parameters():
+        #    param.requires_grad = False
 
-        for param in self.temporal.parameters():
-            param.requires_grad = False
+        #for param in self.temporal.parameters():
+        #    param.requires_grad = False
 
     def forward(self, x):
 
         x_spa = self.spatial(x[0])
         x_temp = self.temporal(x[1])
+
+        x_res = torch.cat((x_spa, x_temp), 1)
+        return self.fusion(x_res)
+
+class MixModelDefaultSNNBig_expV(nn.Module):
+    """
+        Mixer model composed of spatial, temporal and fusion models
+    """
+
+    def __init__(self, num_classes, debug = False):
+        super(MixModelDefaultSNNBig_expV, self).__init__()
+
+        self.debug = debug
+
+        self.spatial =  models.video.r3d_18(pretrained=True)
+        self.temporal =  models.video.r3d_18(pretrained=True)
+        self.fusion = MixClassificationBigSNN_expV(400,num_classes)
+
+        self.softmax1 = nn.Softmax()
+        self.softmax2 = nn.Softmax()
+
+    def forward(self, x):
+
+        x_spa = self.spatial(x[0])
+        x_temp = self.temporal(x[1])
+
+        x_spa = self.softmax1(x_spa)
+        x_temp = self.softmax1(x_temp)
+
 
         x_res = torch.cat((x_spa, x_temp), 1)
         return self.fusion(x_res)

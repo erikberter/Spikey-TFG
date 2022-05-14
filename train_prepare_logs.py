@@ -9,12 +9,12 @@ from configparser import ConfigParser
 from yaml import parse
 
 
-from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small, RPlus_CNN
-from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled, C3SNN_ModelT_paramed, C3DSNN_Whole
-from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale, ResNet_Cop_SNN, SNN_Cont
+from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small, RPlus_CNN, ResNet_CNN_exp, ResNet_CNN_expV, ResNet_CNN_Test
+from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled, C3SNN_ModelT_paramed, C3DSNN_Whole, C3DSNN_Whole_Exp , C3DNN_Whole_Exp, C3DSNN_ModelT_Final
+from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale, ResNet_Cop_SNN, SNN_Cont, ResNet_SNN_exp, ResNet_SNN_expV
 
-from network.MixModels.mixer_models import MixModelDefault
-from network.MixModels.mixer_models_SNN import MixModelDefaultSNN, MixModelAltSNN, MixModelDefaultSNNBig
+from network.MixModels.mixer_models import MixModelDefault, MixModelDefault_expV, MixModelDefault_Test
+from network.MixModels.mixer_models_SNN import MixModelDefaultSNN, MixModelAltSNN, MixModelDefaultSNNBig, MixModelDefaultSNNBig_expV
 
 
 from tqdm import tqdm
@@ -76,11 +76,26 @@ def run_net(net, data, num_classes):
     if type(data) == list:
         # Is Mixed
         cops = torch.zeros(data[0].shape[0],data[0].shape[2], num_classes).to(device)
+        
+        
+        #data[1] -= 38 # Set to ral average in flow
+
         data[0] /= 255
         data[1] /= 255
+       
+
+        """print(f"DAta 0 Mean: {torch.mean(data[0])}")
+        print(f"DAta 0 Max: {torch.max(data[0])}")
+        print(f"DAta 0 Min: {torch.min(data[0])}")
+        print("_---------------")
+        print(f"DAta 1 Mean: {torch.mean(data[1])}")
+        print(f"DAta 1 Max: {torch.max(data[1])}")
+        print(f"DAta 1 Min: {torch.min(data[1])}")
+        print("_---------------")
+        input("pausa")"""
     else:
         cops = torch.zeros(data.shape[0],data.shape[2], num_classes).to(device)
-    
+
         data /= 255
 
     if useWholeTimeSet:
@@ -152,9 +167,45 @@ def train_model(epoch, model, num_classes, train_dataloader, scheduler, optimize
         preds = torch.max(cops, 1)[1]
 
         loss = criterion(cops.double(), labels.long())
-        
+        #print("------------------")
+        #print(loss)
+
         loss.backward()
+        #loss.backward(retain_graph=True)
+        #torch.set_printoptions(precision=20)
+        #print(f"Clas 0 {model.lin.weight.grad}")
+        #print(f"Clas 3 {model.lin1.weight.grad}")
+        #print(f"Clas 6 {model.lin2.weight.grad}")
+        #print(f"Clas 9 {model.li.input_weights.grad}")
+        #print(f"Clas 6 {model.classification[9].weight.grad}")
+        #print(f"Clas 9 {model.li.input_weights.grad}")
+        #print(f"Clas fc {model.features.fc.weight.grad}")
+
+        #print(f"Clas 0 {torch.mean(torch.abs(model.lin.weight.grad[0]))}")
+        #print(f"Clas 3 {torch.mean(torch.abs(model.lin1.weight.grad[0]))}")
+        #print(f"Clas 6 {torch.mean(torch.abs(model.lin2.weight.grad[0]))}")
+        #print(f"Clas 9 {torch.mean(torch.abs(model.li.input_weights.grad[0]))}")
+        #print(f"Clas fc {torch.mean(torch.abs(model.features.fc.weight.grad[0]))}")
+
+        #q_weig = model.features.fc.weight.data.detach().clone()
+        #q1_weig = model.lin.weight.data.detach().clone()
+        #q2_weig = model.lin2.weight.data.detach().clone()
+        #q3_weig = model.li.input_weights.data.detach().clone()
         optimizer.step()
+
+        #print(f"Diff fc {torch.mean(model.features.fc.weight.data - q_weig)}")
+        #print(f"Diff lin {torch.mean(model.lin.weight.data- q1_weig)}")
+        #print(f"Diff lin2 {torch.mean(model.lin2.weight.data - q2_weig)}")
+        #print(f"Diff li {torch.mean(model.li.input_weights.data- q3_weig)}")
+        #print(f"Max fc {torch.max(model.features.fc.weight.data - q_weig)}")
+        #print(f"Max lin {torch.max(model.lin.weight.data- q1_weig)}")
+        #print(f"Max lin2 {torch.max(model.lin2.weight.data - q2_weig)}")
+        #print(f"Max li {torch.max(model.li.input_weights.data- q3_weig)}")
+        #print(f"Min fc {torch.min(model.features.fc.weight.data - q_weig)}")
+        #print(f"Min lin {torch.min(model.lin.weight.data- q1_weig)}")
+        #print(f"Min lin2 {torch.min(model.lin2.weight.data - q2_weig)}")
+        #print(f"Min li {torch.min(model.li.input_weights.data- q3_weig)}")
+        #input("Para")
 
         if is_mixed:
             running_loss += loss.item() * inputs[0].size(0)
@@ -334,14 +385,25 @@ def train_session_model(
     
 
     model.to(device)
-
+    
+    #if hasattr(model, 'classification') and "SNN" in model.__class__.__name__:
+    #if "SNN" in model.__class__.__name__:
+    #    print("Tiene esta capa")
+    #    train_params = [{'params': model.features.parameters(), 'lr': lr  * 2 },
+    #                    {'params': model.lin.parameters(), 'lr' : lr * 2 },
+    #                    {'params': model.lin1.parameters(), 'lr' : lr* 2},
+    #                    {'params': model.lin2.parameters(), 'lr' : lr* 2 },
+    #                    {'params': model.li.parameters(), 'lr' : lr * 2 }]
+    #else:
+    #    train_params = [{'params': model.parameters(), 'lr': lr},]
     train_params = [{'params': model.parameters(), 'lr': lr},]
     
 
     criterion = nn.CrossEntropyLoss()  # standard crossentropy loss for classification
+    
     optimizer = optim.Adam(train_params, lr=lr, weight_decay=1e-5)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5,
-                                          gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
+    #optimizer = optim.SGD(train_params, lr=lr, momentum=0.9)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)  # the scheduler divides the lr by 10 every 10 epochs
 
     if resume_epoch == 0:
         print("Training {} from scratch...".format(modelName))
@@ -433,8 +495,45 @@ train_models = [
     (("ResNet_SNN_Cop", ResNet_Cop_SNN, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
     (("ResNet_SNN_Cop", ResNet_Cop_SNN, "hmdb51_2", 2e-4, 20, 4,  True, 2), {}),
     (("ResNet_SNN_Cop", ResNet_Cop_SNN, "hmdb51_3", 2e-4, 20, 4,  True, 2), {}),
-    (("SNN_Cont", SNN_Cont, "kth_rbg_diff", 2e-4, 20, 4,  True, 2), {}),
+    #(("SNN_Cont", SNN_Cont, "kth_rbg_diff", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_CNN_exp", ResNet_CNN_exp, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    #(("ResNet_SNN_exp", ResNet_SNN_exp, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    #(("ResNet_CNN_exp", ResNet_CNN_exp, "kth", 2e-4, 20, 4,  True, 2), {}),
+    #(("ResNet_CNN_exp", ResNet_CNN_exp, "ucf101", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_2CNN", MixModelDefault, "kth", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_2CNN_SNN_Alt", MixModelDefaultSNNBig, "kth", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("ResNet_2CNN_SNN_Alt_train", MixModelDefaultSNNBig, "kth", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    #(("ResNet_2CNN_Untrainable", MixModelDefault, "kth", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    
+    (("C3DSNN__Final", C3DSNN_ModelT_Final, "kth", 2e-4, 20, 5,  True, 2), {}),
+    (("C3DSNN_F", C3DSNN_ModelT_Final, "kth", 2e-4, 20, 5,  True, 2), {}),
+    (("C3DSNN_F", C3DSNN_ModelT_Final, "hmdb51", 2e-4, 20, 5,  True, 2), {}),
+    #(("C3DSNN_F", C3DSNN_ModelT_Final, "ucf101", 2e-4, 20, 5,  True, 2), {}),
 
+
+    
+    (("ResNet_SNN_exp_fp", ResNet_SNN_expV, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_CNN_exp_fp", ResNet_CNN_expV, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_exp_fp", ResNet_SNN_expV, "ucf101", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_CNN_exp_fp", ResNet_CNN_expV, "ucf101", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_exp_fp", ResNet_SNN_expV, "kth", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_CNN_exp_fp", ResNet_CNN_expV, "kth", 2e-4, 20, 4,  True, 2), {}),
+
+
+
+    (("MixModelCNN_expV", MixModelDefault_expV, "kth", 2e-4, 20, 4,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("MixModelSNN_expV", MixModelDefaultSNNBig_expV, "kth", 2e-4, 20, 4,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+
+    #(("MixModelCNN_expV", MixModelDefault_expV, "hmdb51", 2e-4, 20, 4,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("MixModelCNN_expV", MixModelDefault_expV, "hmdb51", 2e-4, 20, 4,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("MixModelSNN_expV", MixModelDefaultSNNBig_expV, "hmdb51", 2e-4, 20, 4,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    
+    #(("MixModelDefault_Test_fp", MixModelDefault_Test, "hmdb51", 2e-4, 20, 4,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    
+    #(("ResNet_CNN_Test_fp", ResNet_CNN_Test, "kth_rbg_diff", 2e-4, 20, 4,  True, 2), {}),
+    (("MixModelCNN_expV", MixModelDefault_expV, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    (("MixModelSNN_expV", MixModelDefaultSNNBig_expV, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
+    
     
 
     
