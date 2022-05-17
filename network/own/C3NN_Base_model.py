@@ -559,13 +559,10 @@ class ResNet_CNN_Test(nn.Module):
         out_1 = self.relu1(out_1)
         out_1 = self.drop1(out_1)
 
-        out_1 = out_1 + out
 
         out_2 = self.lin2(out_1)
         out_2 = self.relu2(out_2)
         out_2 = self.drop2(out_2)
-
-        out_2 = out_2 + out_1
 
         out_f = self.li(out_2)
 

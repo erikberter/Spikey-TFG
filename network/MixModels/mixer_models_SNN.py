@@ -145,19 +145,19 @@ class MixClassificationBigSNN_expV(nn.Module):
         self.seq_length = 24
         self.n_classes = n_classes
 
-        p =  LIFParameters(v_th=torch.as_tensor(0.185))
+        p =  LIFParameters(v_th=torch.as_tensor(0.23))
 
         self.encoder = ConstantCurrentLIFEncoder(self.seq_length)
         self.decode = decode
 
 
-        self.lin1 = nn.Linear(2 * input_size, 256, bias=False)
+        self.lin1 = nn.Linear(2 * input_size, 256, bias=True)
         self.lif1 = LIFCell(p)
         self.drop1 = nn.Dropout(0.25)
-        self.lin2 = nn.Linear(256, 256, bias=False)
+        self.lin2 = nn.Linear(256, 256, bias=True)
         self.lif2 = LIFCell(p)
         self.drop2 = nn.Dropout(0.25)
-        self.lin3 = nn.Linear(256, 256, bias=False)
+        self.lin3 = nn.Linear(256, 256, bias=True)
         self.lif3 = LIFCell(p)
         self.drop3 = nn.Dropout(0.25)
         self.li = LILinearCell(256, n_classes, p)
@@ -343,8 +343,8 @@ class MixModelDefaultSNNBig_expV(nn.Module):
         x_spa = self.spatial(x[0])
         x_temp = self.temporal(x[1])
 
-        x_spa = self.softmax1(x_spa)
-        x_temp = self.softmax1(x_temp)
+        #x_spa = self.softmax1(x_spa)
+        #x_temp = self.softmax1(x_temp)
 
 
         x_res = torch.cat((x_spa, x_temp), 1)

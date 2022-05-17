@@ -11,7 +11,7 @@ from yaml import parse
 
 from network.own.C3NN_Base_model import ResNet_CNN, C3DNN_Small, RPlus_CNN, ResNet_CNN_exp, ResNet_CNN_expV, ResNet_CNN_Test
 from network.norse.C3SNN_model import C3SNN_ModelT, C3SNN_ModelT_scaled, C3SNN_ModelT_paramed, C3DSNN_Whole, C3DSNN_Whole_Exp , C3DNN_Whole_Exp, C3DSNN_ModelT_Final
-from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale, ResNet_Cop_SNN, SNN_Cont, ResNet_SNN_exp, ResNet_SNN_expV
+from network.CNN_Norse_model import ResNet_SNN, ResNet_SNN_InverseScale, ResNet_Cop_SNN, SNN_Cont, ResNet_SNN_exp, ResNet_SNN_expV,ResNet_SNN_expVSL
 
 from network.MixModels.mixer_models import MixModelDefault, MixModelDefault_expV, MixModelDefault_Test
 from network.MixModels.mixer_models_SNN import MixModelDefaultSNN, MixModelAltSNN, MixModelDefaultSNNBig, MixModelDefaultSNNBig_expV
@@ -148,7 +148,7 @@ def train_model(epoch, model, num_classes, train_dataloader, scheduler, optimize
     model.train()
     i = 1
     for inputs, labels in (sbar := tqdm(train_dataloader)):
-        sbar.set_description("Curr Acc %s " % str(100*running_corrects/(i*6)))
+        sbar.set_description("Curr Acc %s " % str(100*running_corrects/(max(1,i-1)*16)))
         i += 1
         if is_mixed:
             inputs = [
@@ -181,10 +181,10 @@ def train_model(epoch, model, num_classes, train_dataloader, scheduler, optimize
         #print(f"Clas 9 {model.li.input_weights.grad}")
         #print(f"Clas fc {model.features.fc.weight.grad}")
 
-        #print(f"Clas 0 {torch.mean(torch.abs(model.lin.weight.grad[0]))}")
-        #print(f"Clas 3 {torch.mean(torch.abs(model.lin1.weight.grad[0]))}")
-        #print(f"Clas 6 {torch.mean(torch.abs(model.lin2.weight.grad[0]))}")
         #print(f"Clas 9 {torch.mean(torch.abs(model.li.input_weights.grad[0]))}")
+        #print(f"Clas 6 {torch.mean(torch.abs(model.lin2.weight.grad[0]))}")
+        #print(f"Clas 3 {torch.mean(torch.abs(model.lin1.weight.grad[0]))}")
+        #print(f"Clas 0 {torch.mean(torch.abs(model.lin.weight.grad[0]))}")
         #print(f"Clas fc {torch.mean(torch.abs(model.features.fc.weight.grad[0]))}")
 
         #q_weig = model.features.fc.weight.data.detach().clone()
@@ -193,18 +193,26 @@ def train_model(epoch, model, num_classes, train_dataloader, scheduler, optimize
         #q3_weig = model.li.input_weights.data.detach().clone()
         optimizer.step()
 
-        #print(f"Diff fc {torch.mean(model.features.fc.weight.data - q_weig)}")
-        #print(f"Diff lin {torch.mean(model.lin.weight.data- q1_weig)}")
-        #print(f"Diff lin2 {torch.mean(model.lin2.weight.data - q2_weig)}")
-        #print(f"Diff li {torch.mean(model.li.input_weights.data- q3_weig)}")
+        #print("------------------")
+        #print(f"Diff fc {torch.mean(torch.abs(model.features.fc.weight.data - q_weig))}")
+        #print(f"Diff lin {torch.mean(torch.abs(model.lin.weight.data- q1_weig))}")
+        #print(f"Diff lin2 {torch.mean(torch.abs(model.lin2.weight.data - q2_weig))}")
+        #print(f"Diff li {torch.mean(torch.abs(model.li.input_weights.data- q3_weig))}")
+        #print("------------------")
         #print(f"Max fc {torch.max(model.features.fc.weight.data - q_weig)}")
         #print(f"Max lin {torch.max(model.lin.weight.data- q1_weig)}")
         #print(f"Max lin2 {torch.max(model.lin2.weight.data - q2_weig)}")
         #print(f"Max li {torch.max(model.li.input_weights.data- q3_weig)}")
+        #print("------------------")
         #print(f"Min fc {torch.min(model.features.fc.weight.data - q_weig)}")
         #print(f"Min lin {torch.min(model.lin.weight.data- q1_weig)}")
         #print(f"Min lin2 {torch.min(model.lin2.weight.data - q2_weig)}")
         #print(f"Min li {torch.min(model.li.input_weights.data- q3_weig)}")
+        #print("------------------")
+        #print(f"Abs Min fc {torch.min(torch.abs(model.features.fc.weight.data - q_weig))}")
+        #print(f"Abs Min lin {torch.min(torch.abs(model.lin.weight.data- q1_weig))}")
+        #print(f"Abs Min lin2 {torch.min(torch.abs(model.lin2.weight.data - q2_weig))}")
+        #print(f"Abs Min li {torch.min(torch.abs(model.li.input_weights.data- q3_weig))}")
         #input("Para")
 
         if is_mixed:
@@ -535,8 +543,12 @@ train_models = [
     (("MixModelSNN_expV", MixModelDefaultSNNBig_expV, "ucf101", 2e-4, 20, 2,  True, 2), {'is_mixed' : True, 'dataloader_params' : {'clip_len' : 16, 'batch_size' : 6}}),
     
     
+    (("ResNet_SNN_exp_fp", ResNet_SNN_expVSL, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_exp_fp", ResNet_SNN_expVSL, "ucf101", 2e-4, 20, 4,  True, 2), {}),
 
     
+    (("ResNet_SNN_exp_fpCap", ResNet_SNN_expVSL, "hmdb51", 2e-4, 20, 4,  True, 2), {}),
+    (("ResNet_SNN_exp_fpCap", ResNet_SNN_expVSL, "ucf101", 2e-4, 20, 4,  True, 2), {}),
    ]
 
 
@@ -565,7 +577,7 @@ def save_config_pre(config = None):
 if __name__ == "__main__":
     
     config = prepare_config()
-    
+    torch.autograd.set_detect_anomaly(True)
     for i, model_params in enumerate(train_models):
         print(f" Act {i} _ {model_params[0][0]} _ {model_params[0][2]}")
         if int(config['session']['last_model']) > i:

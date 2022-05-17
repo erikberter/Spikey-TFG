@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from norse.torch.module import SequentialState
 
-from norse.torch.functional.lif import LIFParameters
+from norse.torch.functional.lif import LIFParameters, lif_current_encoder
 from norse.torch.module.encode import ConstantCurrentLIFEncoder
 from norse.torch.module.lif import LIFRecurrentCell, LIFCell
 from norse.torch.module.leaky_integrator import LILinearCell
@@ -11,6 +11,65 @@ from norse.torch.module.leaky_integrator import LILinearCell
 from norse.torch.module.lsnn import LSNNCell
 
 import torchvision.models as models
+
+
+
+
+def spike_latency_lif_encode(
+    input_current: torch.Tensor,
+    seq_length: int,
+    p: LIFParameters = LIFParameters(),
+    dt=0.001,
+) -> torch.Tensor:
+    """Encodes an input value by the time the first spike occurs.
+    Similar to the ConstantCurrentLIFEncoder, but the LIF can be
+    thought to have an infinite refractory period.
+
+    Parameters:
+        input_current (torch.Tensor): Input current to encode (needs to be positive).
+        sequence_length (int): Number of time steps in the resulting spike train.
+        p (LIFParameters): Parameters of the LIF neuron model.
+        dt (float): Integration time step (should coincide with the integration time step used in the model)
+    """
+    voltage = torch.zeros_like(input_current)
+    z = torch.zeros_like(input_current)
+    mask = torch.zeros_like(input_current)
+    spikes = []
+    
+
+    for _ in range(seq_length):
+        z, voltage = lif_current_encoder(
+            input_current=input_current, voltage=voltage, p=p, dt=dt
+        )
+
+        spikes += [torch.where(mask > 0, torch.zeros_like(z), z)]
+        mask += z
+
+    return torch.stack(spikes)
+
+
+class SpikeLatencyLIFEncoder(torch.nn.Module):
+    """Encodes an input value by the time the first spike occurs.
+    Similar to the ConstantCurrentLIFEncoder, but the LIF can be
+    thought to have an infinite refractory period.
+    Parameters:
+        sequence_length (int): Number of time steps in the resulting spike train.
+        p (LIFParameters): Parameters of the LIF neuron model.
+        dt (float): Integration time step (should coincide with the integration time step used in the model)
+    """
+
+    def __init__(self, seq_length, p=LIFParameters(), dt=0.001):
+        super(SpikeLatencyLIFEncoder, self).__init__()
+        self.seq_length = seq_length
+        self.p = p
+        self.dt = dt
+
+    def forward(self, input_current):
+        return spike_latency_lif_encode(
+            input_current, self.seq_length, self.p, self.dt
+        )
+
+
 
 class CNN_Norse_model(nn.Module):
     def __init__(self, n_classes):
@@ -340,6 +399,103 @@ class ResNet_SNN_expV(nn.Module):
             voltages[ts, :, :] = out_f
         
         y_hat = voltages[-1]
+        #print(f"El y_hat es de {y_hat[0]}")
+        
+        return y_hat
+
+
+class ResNet_SNN_expVSL(nn.Module):
+    def __init__(self, n_classes):
+        super(ResNet_SNN_expVSL, self).__init__()
+
+        self.seq_length = 24
+        self.n_classes = n_classes
+        self.uses_ts = False
+        self.constant_current_encoder = SpikeLatencyLIFEncoder(self.seq_length)
+        
+        p=LIFParameters(v_th=torch.as_tensor(0.085))
+
+        self.features = models.video.r3d_18(pretrained=True)
+        #for param in self.features.parameters():
+        #    param.requires_grad = False
+        
+            
+        self.lin =     nn.Linear(400, 128, bias=False)
+        self.lif =    LIFCell(p)
+        self.drop =    nn.Dropout(0.25)
+        self.lin1 =    nn.Linear(128, 128, bias=False)
+        self.lif1 =    LIFCell(p)
+        self.drop1 =    nn.Dropout(0.25)
+        self.lin2 =    nn.Linear(128, 128, bias=False)
+        self.lif2 =    LIFCell(p)
+        self.drop2 =    nn.Dropout(0.25)
+        self.li =    LILinearCell(128, n_classes, p)
+        
+
+        self.batchnorm = nn.BatchNorm1d(400)
+        
+
+        self.feature_scalar = torch.nn.Parameter(torch.ones(1)) 
+        self.encoder_scalar = torch.nn.Parameter(torch.ones(1))
+
+    def print_params(self):
+        print(f"Feature Scalar {self.feature_scalar}")
+        print(f"Encoder Scalar {self.encoder_scalar}")
+
+    def forward(self, x):
+        batch_size = x.shape[1] if self.uses_ts else x.shape[0]
+        voltages = torch.empty(
+            self.seq_length, batch_size, self.n_classes, device=x.device, dtype=x.dtype
+        )
+
+        out = self.features(x)
+        #out = self.batchnorm(out)
+        #print(f"El out_0 es de {out[0]}")
+        #input("Pausa")
+        out_f = torch.flatten(out, start_dim=1)
+        #out_f =  * self.relu(out_f)
+        
+        
+        #print(f"El out_f es de {out_f[0]}")
+        encoded = self.constant_current_encoder(out_f)
+
+        sc, sl0,sl1,sl2 = None, None,None,None
+        for ts in range(self.seq_length):
+            z = encoded[ts, :] 
+            #print(f"La media en {ts} es de {torch.mean(z)}")
+            #input("Pausa")
+            #out_c, sc = self.classification(z, sc)
+
+            out = self.lin(z)
+            out, sl0 = self.lif(out, sl0) 
+            out = self.drop(out)
+
+            out_1 = self.lin1( out)
+            out_1, sl1 = self.lif1(out_1, sl1)
+            out_1 = self.drop1(out_1)
+
+            out_1 = out_1 + out
+
+            out_2 = self.lin2( out_1)
+            out_2, sl2 = self.lif2(out_2, sl2)
+            out_2 = self.drop2(out_2)
+            
+            out_2 = out_2 + out_1
+
+            out_f, sc = self.li(out_2, sc)
+
+
+            voltages[ts, :, :] = out_f
+        
+        
+        #y_hat = voltages[-1]
+        y_hat, _ = torch.max(voltages, 0)
+
+        #print("----------------------")
+
+        #print(f"y_hat is {y_hat}")
+
+        #input("Stop")
         #print(f"El y_hat es de {y_hat[0]}")
         
         return y_hat
